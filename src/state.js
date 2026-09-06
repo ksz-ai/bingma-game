@@ -37,7 +37,8 @@ export const S = {
   clashed: false,
   cancelled: { player: false, ai: false },   // 同时命中时被高伤招式压制作废的一方
   // 联机
-  myNonce: null, revealSent: false, peerStaleSince: 0, netErr: 0,
+	  myNonce: null, revealSent: false, peerStaleSince: 0, netErr: 0,
+	  pvpJoinTime: 0, isReconnecting: false,
 };
 
 export function setFeedback(msg, dur = 1.2) { S.fbMsg = msg; S.fbUntil = now() + dur; }

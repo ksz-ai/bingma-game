@@ -8,8 +8,8 @@ const BROKER = "wss://broker-cn.emqx.io:8084/mqtt";
 const NS = "bingma/v1/";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LEN = 5;
-const PEER_STALE = 15000;   // 对方状态超过此毫秒数视为失联（心跳 3s，容忍连丢 5 拍）
-const HOST_STALE = 45000;   // 加入时房主新鲜度宽限（房主短暂锁屏不至于判房号过期）
+const PEER_STALE = 15000;   // 超过此毫秒数未收到对方消息视为失联（心跳 3s，容忍连丢 5 拍）
+const HOST_STALE = 180000;  // 加入时房主状态的最大年龄（只挡真正死掉的幽灵房间；在线与否由收信时刻判断）
 const PUB_WAIT = 12000;     // 断线时发布重试上限：mqtt.js 每 2.5s 自动重连，抖动不该判死
 const BEAT_MS = 3000;       // 心跳：定期重发自己状态（刷新对方视角的在线时间）
 const TICK_MS = 1000;
@@ -17,6 +17,7 @@ const TICK_MS = 1000;
 let client = null, code = null, you = null, token = null;
 let my = null;              // 我方最新状态（自己发布的内容）
 let peer = null;            // 对方最新状态（订阅所得）
+let peerLastRecv = 0;       // 本机最近一次收到对方消息的时刻（不受对方设备时钟影响）
 let pinnedPeerTok = null;   // 锁定的对手身份，防止第三者冒名顶替
 let onStateCb = null, onErrorCb = null;
 let beatTimer = 0, tickTimer = 0;
@@ -77,7 +78,7 @@ function connect() {
       /* 遗嘱故意不带 tok：断线触发的 bye 会被对方过滤器忽略（无 tok），
          走"失联→宽限→重连恢复"路径；主动离场（leaveRoom）的 bye 才带 tok */
       will: { topic: myTopic(), payload: JSON.stringify({ v: 1, bye: 1 }),
-              retain: true, qos: 0 },
+              retain: true, qos: 1 },
     });
     let settled = false;
     const to = setTimeout(() => {
@@ -92,18 +93,31 @@ function connect() {
       c.end(true); reject(new Error("联机服务器连接失败"));
     });
     c.on("message", onMessage);
-    c.on("close", () => { if (settled && onErrorCb) onErrorCb(new Error("联机连接中断，重连中…")); });
-    c.on("connect", () => { if (my && !probing) publishMy().catch(() => {}); });  // 重连成功立即补发状态
+    c.on("close", () => {
+    S.isReconnecting = true;  // 标记重连状态，engine 层不累积错误计数
+    if (settled && onErrorCb) onErrorCb(new Error("联机连接中断，重连中…"));
+  });
+    c.on("connect", () => {
+    if (my && !probing) {
+      publishMy().catch(() => {});
+      if (onReconnectCb) onReconnectCb();
+    }
+  });  // 重连成功立即补发状态并通知引擎
   });
 }
 
 function onMessage(t, payload) {
   if (probing || !code || t !== peerTopic()) return;
   let m; try { m = JSON.parse(payload.toString()); } catch { return; }
-  if (!m || typeof m !== "object" || !m.tok) return;
-  if (!pinnedPeerTok && !m.bye) pinnedPeerTok = m.tok;
-  if (pinnedPeerTok && m.tok !== pinnedPeerTok) return;  // 非锁定对手的消息一律忽略
+  if (!m || typeof m !== "object" || !m.tok) return;   // 无 tok：断线遗嘱，走失联宽限路径
+  if (m.bye) {                                          // 对手主动退出：释放对手位，好让新人接管
+    if (!pinnedPeerTok || m.tok === pinnedPeerTok) { peer = null; pinnedPeerTok = null; }
+    tick(); return;
+  }
+  if (!pinnedPeerTok) pinnedPeerTok = m.tok;
+  if (m.tok !== pinnedPeerTok) return;  // 非锁定对手的消息一律忽略
   peer = m;
+  peerLastRecv = Date.now();
   tick();
 }
 
@@ -131,7 +145,7 @@ const parseState = raw => {
 async function tearDown() {
   stopPolling();
   if (client) { try { client.end(); } catch { /* 已断开 */ } }
-  client = null; my = null; peer = null; pinnedPeerTok = null;
+  client = null; my = null; peer = null; peerLastRecv = 0; pinnedPeerTok = null;
 }
 
 export async function createRoom() {
@@ -171,7 +185,7 @@ export async function joinRoom(inputCode) {
     return fail("房号不存在或已过期");
   if (other && !other.bye && Date.now() - (other.t || 0) < PEER_STALE)
     return fail("房间已有人，无法加入");
-  peer = host; pinnedPeerTok = host.tok;
+  peer = host; pinnedPeerTok = host.tok; peerLastRecv = Date.now();
   client.subscribe(peerTopic(), { qos: 1 });
   my = freshState(1);
   await publishMy();
@@ -201,7 +215,7 @@ export async function leaveRoom() {
   stopPolling();
   const c = client, t = code ? myTopic() : null;
   const bye = JSON.stringify({ v: 1, bye: 1, tok: token });
-  client = null; my = null; peer = null; pinnedPeerTok = null;
+  client = null; my = null; peer = null; peerLastRecv = 0; pinnedPeerTok = null;
   code = null; you = null; token = null;
   if (!c) return;
   await new Promise(r => {
@@ -209,13 +223,13 @@ export async function leaveRoom() {
     const fin = () => { if (!done) { done = true; try { c.end(); } catch {} r(); } };
     setTimeout(fin, 600);
     try {
-      if (c.connected) c.publish(t, bye, { retain: true, qos: 0 }, fin);
+      if (c.connected) c.publish(t, bye, { retain: true, qos: 1 }, fin);
       else fin();
     } catch { fin(); }
   });
 }
 
-export function startPolling(onState, onError) {
+export function startPolling(onState, onError, onReconnect) {
   onStateCb = onState; onErrorCb = onError;
   clearInterval(beatTimer); clearInterval(tickTimer);
   beatTimer = setInterval(() => {
@@ -226,10 +240,10 @@ export function startPolling(onState, onError) {
 }
 
 export function stopPolling() {
-  clearInterval(beatTimer); clearInterval(tickTimer);
-  beatTimer = 0; tickTimer = 0;
-  onStateCb = null; onErrorCb = null;
-}
+	  clearInterval(beatTimer); clearInterval(tickTimer);
+	  beatTimer = 0; tickTimer = 0;
+	  onStateCb = null; onErrorCb = null; onReconnectCb = null;
+	}
 
 /* 手机切后台回前台：立即补心跳，缩短被对方误判失联的窗口 */
 if (typeof document !== "undefined") {
@@ -258,10 +272,12 @@ function tick() {
 
 function buildState() {
   const live = peer && !peer.bye;
+  /* 在线判定用"本机最后一次收到对方消息的时刻"，与对方设备时钟无关 */
+  const seen = !!live && peerLastRecv > 0 && Date.now() - peerLastRecv < PEER_STALE;
   return {
     ok: true, you, round: my ? my.round : 1,
     peerJoined: !!live,
-    peerSeen: !!live && Date.now() - (peer.t || 0) < PEER_STALE,
+    peerSeen: seen,
     myAck: !!(my && my.ack), peerAck: !!(live && peer.ack),
     myCommit: my ? my.commit : null,
     peerCommit: live ? peer.commit : null,

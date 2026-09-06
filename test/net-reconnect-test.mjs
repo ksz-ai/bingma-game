@@ -62,8 +62,39 @@ const peerT = A._debug().peer && A._debug().peer.t;
 check("重连后心跳恢复（A 看到新鲜的 B 状态）", !!peerT && Date.now() - peerT < 5000);
 check("重连后 A 仍能收到 B 的承诺", !!(lastA && lastA.peerCommit));
 
+/* ═══ 场景 5：对手主动退出后，对手位必须释放（回归：旧代码锁死旧令牌，重进者被永久忽略） ═══ */
 A.stopPolling(); B.stopPolling();
 await A.leaveRoom();
 await B.leaveRoom();
+
+const code2 = await A.createRoom();
+A.startPolling(pollA, () => {});
+const C = await import(new URL("../src/net.js?client=C", import.meta.url).href);
+await C.joinRoom(code2);
+C.startPolling(() => {}, () => {});
+await sleep(1500);
+check("重进的房间：C 加入后房主可见", !!(lastA && lastA.peerJoined));
+
+await C.leaveRoom();   // 主动退出（带 tok 的 bye）
+let released = false;
+for (let i = 0; i < 10 && !released; i++) {
+  await sleep(400);
+  if (lastA && !lastA.peerJoined) released = true;
+}
+check("C 退出后对手位已释放", released);
+
+const D = await import(new URL("../src/net.js?client=D", import.meta.url).href);
+await D.joinRoom(code2);   // 新令牌的加入者（旧代码会被房主的旧 pin 永久过滤）
+D.startPolling(() => {}, () => {});
+let sawNewPeer = false;
+for (let i = 0; i < 10 && !sawNewPeer; i++) {
+  await sleep(400);
+  if (lastA && lastA.peerJoined) sawNewPeer = true;
+}
+check("新加入者 D 能被房主接受（对手位未锁死）", sawNewPeer);
+
+A.stopPolling(); D.stopPolling();
+await A.leaveRoom();
+await D.leaveRoom();
 console.log(failed ? "\n" + failed + " CASE(S) FAILED" : "\nALL NET RECONNECT TESTS PASSED");
 process.exit(failed ? 1 : 0);

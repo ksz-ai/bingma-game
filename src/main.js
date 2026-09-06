@@ -87,11 +87,14 @@ function lobbyStatus(msg, err = false) {
 }
 
 function enterPvp() {
-  inLobby = false;
-  $("lobby-scr").classList.add("hidden");
-  startGame("pvp");
-  net.startPolling(handleNetState, handleNetError);
-}
+	  inLobby = false;
+	  $("lobby-scr").classList.add("hidden");
+	  startGame("pvp");
+	  net.startPolling(handleNetState, handleNetError, () => {
+	    S.isReconnecting = false;
+	    S.netErr = 0;
+	  });
+	}
 
 $("btn-pvp").addEventListener("click", showLobby);
 $("btn-lobby-back").addEventListener("click", backFromLobby);

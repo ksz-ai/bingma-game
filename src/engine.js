@@ -76,7 +76,7 @@ export function update(dt) {
   } else if (S.phase === "waiting" && S.gameMode === "pve") {
     if (now() - S.waitStart >= WAIT_TIME) settle(S.pending, aiChoose());
   } else if (S.phase === "waiting" && S.gameMode === "pvp") {
-    if (now() - S.waitStart > 45) return pvpAbort("对手迟迟未出招，已返回客栈");
+    if (now() - S.waitStart > 90) return pvpAbort("对手迟迟未出招，已返回客栈");
   } else if (S.phase === "reveal") {
     if (now() - S.revealStart >= S.revealDur) {
       if (S.pendingResult) {
@@ -103,11 +103,17 @@ export async function handleNetState(st) {
   if (S.gameMode !== "pvp" || S.result) return;
   S.netErr = 0;
 
-  if (!st.peerJoined) return pvpAbort("对手已离开，对局结束");
-  if (!st.peerSeen) {   // 短暂失联：等待自动重连，超过 15s 才判掉线
-    setFeedback("对手连接波动，等待重连…", 1.5);
-    if (!S.peerStaleSince) S.peerStaleSince = now();
-    else if (now() - S.peerStaleSince > 15) return pvpAbort("对手掉线，已返回客栈");
+  if (!st.peerJoined) {
+    const joinTime = S.pvpJoinTime || (S.pvpJoinTime = now());
+    if (now() - joinTime > 3) return pvpAbort("对手已离开，对局结束");
+    return;  // 3 秒缓冲期，允许 MQTT 连接初期抖动
+  }
+  if (!st.peerSeen) {   // 短暂失联：等对方从锁屏/切后台/网络波动中回来，90s 才判掉线
+    if (S.peerStaleSince) {
+      if (now() - S.peerStaleSince > 3 && now() - S.peerStaleSince <= 90)
+        setFeedback("对手暂离，等待归来…", 1.5);
+      else if (now() - S.peerStaleSince > 90) return pvpAbort("对手长时间未归，已返回客栈");
+    } else S.peerStaleSince = now();
   } else {
     if (S.peerStaleSince) setFeedback("对手已重新连上", 1.2);
     S.peerStaleSince = 0;
@@ -135,9 +141,11 @@ export async function handleNetState(st) {
 }
 
 export function handleNetError(e) {
-  if (S.gameMode !== "pvp" || S.result) return;
-  if (++S.netErr > 8) pvpAbort("网络不稳，已返回客栈");
-}
+	  if (S.gameMode !== "pvp" || S.result) return;
+	  if (!S.isReconnecting) {
+	    if (++S.netErr > 8) pvpAbort("网络不稳，已返回客栈");
+	  }
+	}
 
 function pvpAbort(msg) {
   setFeedback(msg, 4);
@@ -168,6 +176,7 @@ export function startGame(mode = "pve") {
   S.clashed = false;
   S.cancelled = { player: false, ai: false };
   S.myNonce = null; S.revealSent = false; S.peerStaleSince = 0; S.netErr = 0;
+	  S.pvpJoinTime = 0; S.isReconnecting = false;
   $("ai-name").textContent = mode === "pvp" ? "对手 · 联机" : "对手 · " + S.selectedDiff;
   $("fx").innerHTML = "";
   $("overlay").classList.add("hidden");
