@@ -66,7 +66,9 @@ npm run preview # 本地预览构建产物
 
 ## 部署
 
-项目部署于 [IGA Pages](https://www.volcengine.com/product/iga-pages)（静态托管 + 边缘函数）。
+推送到 `main` 分支后，GitHub Actions 自动构建并发布到 GitHub Pages（单文件构建产物）。
+
+在线试玩：https://ksz-ai.github.io/bingma-game/
 
 ## License
 
