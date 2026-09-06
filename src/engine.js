@@ -18,7 +18,7 @@ export function trySelect(name) {
   if (S.gameMode === "pvp") {
     S.myNonce = net.randNonce();
     S.revealSent = false;
-    net.commitMove(name, S.myNonce).catch(() => pvpAbort("房间已失效，返回客栈"));
+    net.commitMove(name, S.myNonce).catch(() => pvpAbort("网络不稳，未能出招，返回客栈"));
   }
   S.phase = "waiting";
   S.waitStart = now();
@@ -104,10 +104,14 @@ export async function handleNetState(st) {
   S.netErr = 0;
 
   if (!st.peerJoined) return pvpAbort("对手已离开，对局结束");
-  if (!st.peerSeen) {
+  if (!st.peerSeen) {   // 短暂失联：等待自动重连，超过 15s 才判掉线
+    setFeedback("对手连接波动，等待重连…", 1.5);
     if (!S.peerStaleSince) S.peerStaleSince = now();
-    else if (now() - S.peerStaleSince > 10) return pvpAbort("对手掉线，已返回客栈");
-  } else S.peerStaleSince = 0;
+    else if (now() - S.peerStaleSince > 15) return pvpAbort("对手掉线，已返回客栈");
+  } else {
+    if (S.peerStaleSince) setFeedback("对手已重新连上", 1.2);
+    S.peerStaleSince = 0;
+  }
 
   if (S.phase === "waiting") {
     if (!S.revealSent && st.peerCommit) {
