@@ -8,7 +8,9 @@ const BROKER = "wss://broker-cn.emqx.io:8084/mqtt";
 const NS = "bingma/v1/";
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_LEN = 5;
-const PEER_STALE = 8000;    // 对方状态超过此毫秒数视为掉线
+const PEER_STALE = 15000;   // 对方状态超过此毫秒数视为失联（心跳 3s，容忍连丢 5 拍）
+const HOST_STALE = 45000;   // 加入时房主新鲜度宽限（房主短暂锁屏不至于判房号过期）
+const PUB_WAIT = 12000;     // 断线时发布重试上限：mqtt.js 每 2.5s 自动重连，抖动不该判死
 const BEAT_MS = 3000;       // 心跳：定期重发自己状态（刷新对方视角的在线时间）
 const TICK_MS = 1000;
 
@@ -41,11 +43,28 @@ function freshState(round) {
 }
 
 function publishMy() {
+  const started = Date.now();
   return new Promise((resolve, reject) => {
-    if (!client || !client.connected) return reject(new Error("联机连接未就绪"));
-    my.t = Date.now();
-    client.publish(myTopic(), JSON.stringify(my),
-      { retain: true, qos: 1 }, err => (err ? reject(err) : resolve()));
+    const fail = () => reject(new Error("联机连接未就绪"));
+    const retry = () => (Date.now() - started > PUB_WAIT ? fail() : setTimeout(attempt, 300));
+    const attempt = () => {
+      if (!client) return reject(new Error("房间已失效"));
+      if (!client.connected) return retry();      // 断线重连中：等待而非立刻失败，出招不因抖动作废
+      let done = false;
+      const watchdog = setTimeout(() => {          // 发布恰逢断线时回执会丢：3s 无确认则重试
+        if (done) return;
+        done = true; retry();
+      }, 3000);
+      my.t = Date.now();
+      client.publish(myTopic(), JSON.stringify(my),
+        { retain: true, qos: 1 }, err => {
+          if (done) return;
+          done = true; clearTimeout(watchdog);
+          if (err) return retry();
+          resolve();
+        });
+    };
+    attempt();
   });
 }
 
@@ -55,6 +74,8 @@ function connect() {
       clientId: "bm_" + Math.random().toString(36).slice(2, 12),
       clean: true, keepalive: 30,
       reconnectPeriod: 2500, connectTimeout: 8000,
+      /* 遗嘱故意不带 tok：断线触发的 bye 会被对方过滤器忽略（无 tok），
+         走"失联→宽限→重连恢复"路径；主动离场（leaveRoom）的 bye 才带 tok */
       will: { topic: myTopic(), payload: JSON.stringify({ v: 1, bye: 1 }),
               retain: true, qos: 0 },
     });
@@ -72,6 +93,7 @@ function connect() {
     });
     c.on("message", onMessage);
     c.on("close", () => { if (settled && onErrorCb) onErrorCb(new Error("联机连接中断，重连中…")); });
+    c.on("connect", () => { if (my && !probing) publishMy().catch(() => {}); });  // 重连成功立即补发状态
   });
 }
 
@@ -145,7 +167,7 @@ export async function joinRoom(inputCode) {
   const host = parseState(got[topic("p1")]);
   const other = parseState(got[topic("p2")]);
   const fail = msg => { client.end(); client = null; code = null; you = null; token = null; throw new Error(msg); };
-  if (!host || host.bye || Date.now() - (host.t || 0) > PEER_STALE)
+  if (!host || host.bye || Date.now() - (host.t || 0) > HOST_STALE)
     return fail("房号不存在或已过期");
   if (other && !other.bye && Date.now() - (other.t || 0) < PEER_STALE)
     return fail("房间已有人，无法加入");
@@ -208,6 +230,16 @@ export function stopPolling() {
   beatTimer = 0; tickTimer = 0;
   onStateCb = null; onErrorCb = null;
 }
+
+/* 手机切后台回前台：立即补心跳，缩短被对方误判失联的窗口 */
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && my && client) { publishMy().catch(() => {}); tick(); }
+  });
+}
+
+/* 仅供自动化测试：暴露内部客户端以模拟断线 */
+export function _debug() { return { client, my, peer }; }
 
 function tick() {
   if (!my) return;

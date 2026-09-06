@@ -76,7 +76,7 @@ export function update(dt) {
   } else if (S.phase === "waiting" && S.gameMode === "pve") {
     if (now() - S.waitStart >= WAIT_TIME) settle(S.pending, aiChoose());
   } else if (S.phase === "waiting" && S.gameMode === "pvp") {
-    if (now() - S.waitStart > 30) return pvpAbort("对手迟迟未出招，已返回客栈");
+    if (now() - S.waitStart > 45) return pvpAbort("对手迟迟未出招，已返回客栈");
   } else if (S.phase === "reveal") {
     if (now() - S.revealStart >= S.revealDur) {
       if (S.pendingResult) {
