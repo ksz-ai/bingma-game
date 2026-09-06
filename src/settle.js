@@ -61,3 +61,32 @@ export function attackInfo(side) {
   if (act === "震山掌") return { dmg: 3, hit: foe.pos === "ground" || foe.pos === "underground" };
   return { dmg: 0, hit: false };
 }
+
+/* 对决核心：扣气、位移、碰撞判定与伤害（纯逻辑，联机双方各自执行，结果一致）
+   双方攻击同时命中时：伤值相同 → 互相抵消；伤值更高 → 压制对方，弱方攻击作废 */
+export function resolveCombat(pm, am) {
+  const pOK = begin("player", pm);
+  const aOK = begin("ai", am);
+  if (pOK) resolveMove("player");
+  if (aOK) resolveMove("ai");
+  const pInfo = pOK ? attackInfo("player") : null;
+  const aInfo = aOK ? attackInfo("ai") : null;
+  const bothHit = !!(pInfo && aInfo && pInfo.hit && aInfo.hit);
+  const res = { clashed: false, cancelled: { player: false, ai: false } };
+  if (bothHit && pInfo.dmg === aInfo.dmg) {
+    res.clashed = true;
+    logMsg("铛！你的" + pm + "与对手的" + am + "正面相撞，互相抵消");
+  } else if (bothHit && pInfo.dmg > aInfo.dmg) {
+    res.cancelled.ai = true;
+    logMsg("你的" + pm + "势大力沉，硬生生压过对手的" + am);
+    if (pOK) resolveAttack("player");
+  } else if (bothHit) {
+    res.cancelled.player = true;
+    logMsg("对手的" + am + "势大力沉，硬生生压过你的" + pm);
+    if (aOK) resolveAttack("ai");
+  } else {
+    if (pOK) resolveAttack("player");
+    if (aOK) resolveAttack("ai");
+  }
+  return res;
+}

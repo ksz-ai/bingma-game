@@ -169,7 +169,7 @@ function fxSlash(side) {
 
 /* 震山掌 · 震波扩散，地动山摇 */
 function fxPalm(side) {
-  if (S.clashed) return; /* 相抵时由 fxClash 表现碰撞 */
+  if (S.clashed || S.cancelled[side]) return; /* 相抵由 fxClash 表现；被压制则攻势溃散 */
   const to = tokCenter(other(side));
   [[0, 60], [0.12, 92]].forEach(([delay, size]) => {
     const s = document.createElement("div");

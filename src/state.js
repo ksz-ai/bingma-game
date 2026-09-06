@@ -35,6 +35,7 @@ export const S = {
   report: null, result: null,
   pendingResult: null, revealDur: REVEAL_TIME,
   clashed: false,
+  cancelled: { player: false, ai: false },   // 同时命中时被高伤招式压制作废的一方
   // 联机
   myNonce: null, revealSent: false, peerStaleSince: 0, netErr: 0,
 };

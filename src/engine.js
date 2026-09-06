@@ -3,7 +3,7 @@
    pvp：出招即发承诺哈希，等对手也承诺后亮牌，双方各收招式本地结算（纯函数，结果一致） */
 import { $, now } from "./util.js";
 import { ACTIONS, ROUND_TIME, WAIT_TIME, REVEAL_TIME, PVP_ROUND_TIME, S, setFeedback, newState, logMsg } from "./state.js";
-import { begin, resolveMove, resolveAttack, attackInfo } from "./settle.js";
+import { resolveCombat } from "./settle.js";
 import { aiChoose } from "./ai.js";
 import { skillSound, SFX, thud, clang, startBgm, stopBgm } from "./audio.js";
 import { spawnDmgFx, spawnSkillFx, fxClash, FX_DUR } from "./fx.js";
@@ -27,20 +27,9 @@ export function trySelect(name) {
 export function settle(pm, am) {
   const pS = S.gs.player.shield, aS = S.gs.ai.shield, base = S.gs.log.length;
   S.aiMove = am;
-  const pOK = begin("player", pm);
-  const aOK = begin("ai", am);
-  if (pOK) resolveMove("player");
-  if (aOK) resolveMove("ai");
-  /* 相抵：双方攻击同时命中且伤值相同 → 互不受伤 */
-  const pInfo = pOK ? attackInfo("player") : null;
-  const aInfo = aOK ? attackInfo("ai") : null;
-  S.clashed = !!(pInfo && aInfo && pInfo.dmg > 0 && pInfo.dmg === aInfo.dmg && pInfo.hit && aInfo.hit);
-  if (S.clashed) {
-    logMsg("铛！你的" + pm + "与对手的" + am + "正面相撞，互相抵消");
-  } else {
-    if (pOK) resolveAttack("player");
-    if (aOK) resolveAttack("ai");
-  }
+  const r = resolveCombat(pm, am);
+  S.clashed = r.clashed;
+  S.cancelled = r.cancelled;
 
   const raw = S.gs.log.slice(base);
   const combat = raw.filter(x => x.includes("伤") || x.includes("落空") || x.includes("万剑归宗"));
@@ -173,6 +162,7 @@ export function startGame(mode = "pve") {
   S.timer = S.timerMax; S.report = null; S.result = null; S.fbMsg = null;
   S.pendingResult = null; S.revealDur = REVEAL_TIME;
   S.clashed = false;
+  S.cancelled = { player: false, ai: false };
   S.myNonce = null; S.revealSent = false; S.peerStaleSince = 0; S.netErr = 0;
   $("ai-name").textContent = mode === "pvp" ? "对手 · 联机" : "对手 · " + S.selectedDiff;
   $("fx").innerHTML = "";
