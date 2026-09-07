@@ -3,6 +3,7 @@
    每人一个主题 bingma/v1/<房号>/p1|p2，发布自己最新状态（retain），
    订阅对方主题即时收状态。承诺-亮牌防偷看：先发哈希，双方都承诺后才亮明文。 */
 import mqtt from "mqtt";
+import { S } from "./state.js";
 
 const BROKER = "wss://broker-cn.emqx.io:8084/mqtt";
 const NS = "bingma/v1/";
@@ -19,7 +20,7 @@ let my = null;              // 我方最新状态（自己发布的内容）
 let peer = null;            // 对方最新状态（订阅所得）
 let peerLastRecv = 0;       // 本机最近一次收到对方消息的时刻（不受对方设备时钟影响）
 let pinnedPeerTok = null;   // 锁定的对手身份，防止第三者冒名顶替
-let onStateCb = null, onErrorCb = null;
+let onStateCb = null, onErrorCb = null, onReconnectCb = null;
 let beatTimer = 0, tickTimer = 0;
 let probing = false;
 
@@ -230,7 +231,7 @@ export async function leaveRoom() {
 }
 
 export function startPolling(onState, onError, onReconnect) {
-  onStateCb = onState; onErrorCb = onError;
+  onStateCb = onState; onErrorCb = onError; onReconnectCb = onReconnect;
   clearInterval(beatTimer); clearInterval(tickTimer);
   beatTimer = setInterval(() => {
     if (my && client && client.connected) publishMy().catch(() => {});
