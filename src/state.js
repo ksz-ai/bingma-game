@@ -23,10 +23,29 @@ export const PVP_ROUND_TIME = 10.0;
 export const DIFFS = ["简单", "中等", "困难"];
 export const POS_NAMES = { ground: "平地", sky: "屋脊", underground: "水底" };
 
+/* ══════════ 可选角色：数值差异通过初始状态 + 招式倾向体现 ══════════
+   全部落在现有结算体系里：初始气/罡、吐纳与金钟罩收益、免费招式。
+   PvP 联机为保证双方本地结算一致，暂固定使用首个标准角色（见 engine.startGame）。 */
+export const HEROES = [
+  { id: "swordsman", name: "云隐剑客", tagline: "均衡中庸",
+    startQi: 0, startShield: 0, medQi: 1, goldShield: 3, freeMoves: [],
+    desc: "剑气如行云，攻守平衡，正是江湖各路相通之基。" },
+  { id: "monk", name: "铁衣武僧", tagline: "金身防守",
+    startQi: 0, startShield: 2, medQi: 1, goldShield: 4, freeMoves: [],
+    desc: "一身铁衣金钟罩，开局自带罡气，愈战愈稳。" },
+  { id: "assassin", name: "暗影刺客", tagline: "先手速攻",
+    startQi: 2, startShield: 0, medQi: 1, goldShield: 3, freeMoves: ["袖箭"],
+    desc: "身快气足，开场即占先手，袖箭来去无踪。" },
+];
+export const heroById = id => HEROES.find(h => h.id === id);
+export const heroCost = (hero, name) =>
+  (hero && hero.freeMoves && hero.freeMoves.includes(name)) ? 0 : ACTIONS[name].cost;
+
 export const S = {
   mode: "menu",            // menu | game
   gameMode: "pve",         // pve | pvp
   selectedDiff: "简单",
+  hero: HEROES[0],          // 我方当前所选角色
   gs: null,
   phase: "select",         // select | waiting | reveal | over | sync(pvp)
   pending: null, aiMove: null,
@@ -43,11 +62,11 @@ export const S = {
 
 export function setFeedback(msg, dur = 1.2) { S.fbMsg = msg; S.fbUntil = now() + dur; }
 
-export function newState() {
+export function newState(ph = HEROES[0], ah = HEROES[0]) {
   return {
     round: 1, dead: { player: false, ai: false },
-    player: { qi: 0, shield: 0, pos: "ground" },
-    ai:     { qi: 0, shield: 0, pos: "ground" },
+    player: { qi: ph.startQi, shield: ph.startShield, pos: "ground", hero: ph },
+    ai:     { qi: ah.startQi, shield: ah.startShield, pos: "ground", hero: ah },
     log: [],
   };
 }

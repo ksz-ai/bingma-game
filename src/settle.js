@@ -1,5 +1,5 @@
 /* ══════════ 规则结算：纯函数式，只读写 S.gs ══════════ */
-import { ACTIONS, S, logMsg } from "./state.js";
+import { ACTIONS, heroCost, S, logMsg } from "./state.js";
 
 export function applyDamage(st, dmg) {
   if (st.shield >= dmg) { st.shield -= dmg; return false; }
@@ -9,8 +9,8 @@ export function applyDamage(st, dmg) {
 export function begin(side, name) {
   if (!(name in ACTIONS)) return false;
   const st = S.gs[side];
-  if (st.qi < ACTIONS[name].cost) return false;
-  st.qi -= ACTIONS[name].cost;
+  if (st.qi < heroCost(st.hero, name)) return false;
+  st.qi -= heroCost(st.hero, name);
   return true;
 }
 
@@ -18,10 +18,10 @@ export function resolveMove(side) {
   const me = S.gs[side];
   const act = side === "player" ? S.pending : S.aiMove;
   const you = side === "player" ? "你" : "对手";
-  if (act === "吐纳")       { me.qi += 1; logMsg(you + "盘膝吐纳，气 +1"); }
+  if (act === "吐纳")       { me.qi += me.hero.medQi; logMsg(you + "盘膝吐纳，气 +" + me.hero.medQi); }
   else if (act === "轻功")  { me.pos = "sky"; logMsg(you + "施展轻功，翻上屋脊"); }
   else if (act === "遁地")  { me.pos = "underground"; logMsg(you + "一个翻身，遁入水底"); }
-  else if (act === "金钟罩"){ me.shield += 3; logMsg(you + "运起金钟罩，罡气 +3"); }
+  else if (act === "金钟罩"){ me.shield += me.hero.goldShield; logMsg(you + "运起金钟罩，罡气 +" + me.hero.goldShield); }
   else if (act === "万剑归宗") {
     S.gs.dead[side === "player" ? "ai" : "player"] = true;
     logMsg(you + "祭出万剑归宗！！");

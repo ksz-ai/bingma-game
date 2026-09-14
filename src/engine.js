@@ -2,7 +2,7 @@
    pve：等待 0.7s 后本地 AI 出招并结算
    pvp：出招即发承诺哈希，等对手也承诺后亮牌，双方各收招式本地结算（纯函数，结果一致） */
 import { $, now } from "./util.js";
-import { ACTIONS, ROUND_TIME, WAIT_TIME, REVEAL_TIME, PVP_ROUND_TIME, S, setFeedback, newState, logMsg } from "./state.js";
+import { ACTIONS, HEROES, heroById, heroCost, ROUND_TIME, WAIT_TIME, REVEAL_TIME, PVP_ROUND_TIME, S, setFeedback, newState, logMsg } from "./state.js";
 import { resolveCombat } from "./settle.js";
 import { aiChoose } from "./ai.js";
 import { skillSound, SFX, thud, clang, startBgm, stopBgm } from "./audio.js";
@@ -11,7 +11,7 @@ import * as net from "./net.js";
 
 export function trySelect(name) {
   if (S.pending !== null) { setFeedback("招式已定，静待分晓…"); return; }
-  const cost = ACTIONS[name].cost;
+  const cost = heroCost(S.gs.player.hero, name);
   if (S.gs.player.qi < cost) { setFeedback(name + "需 " + cost + " 点气！"); SFX.invalid(); return; }
   S.pending = name;
   skillSound(name);
@@ -169,7 +169,16 @@ export function startGame(mode = "pve") {
   stopBgm();
   S.gameMode = mode;
   S.timerMax = mode === "pvp" ? PVP_ROUND_TIME : ROUND_TIME;
-  S.gs = newState();
+  /* PvE：我方用所选角色，对手随机一名身份；PvP：双方各自携带所选角色，经握手同步后本地结算一致 */
+  let ph = HEROES[0], ah = HEROES[0];
+  if (mode === "pve") {
+    ph = S.hero;
+    ah = HEROES[Math.floor(Math.random() * HEROES.length)];
+  } else {
+    ph = heroById(S.hero.id) || HEROES[0];
+    ah = heroById(net.peerHeroId()) || HEROES[0];
+  }
+  S.gs = newState(ph, ah);
   S.phase = "select"; S.pending = null; S.aiMove = null;
   S.timer = S.timerMax; S.report = null; S.result = null; S.fbMsg = null;
   S.pendingResult = null; S.revealDur = REVEAL_TIME;
@@ -177,7 +186,8 @@ export function startGame(mode = "pve") {
   S.cancelled = { player: false, ai: false };
   S.myNonce = null; S.revealSent = false; S.peerStaleSince = 0; S.netErr = 0;
 	  S.pvpJoinTime = 0; S.isReconnecting = false;
-  $("ai-name").textContent = mode === "pvp" ? "对手 · 联机" : "对手 · " + S.selectedDiff;
+  $("p-name").textContent = ph.name + " · 你";
+  $("ai-name").textContent = mode === "pvp" ? "对手 · 联机" : "对手 · " + ah.name + " · " + S.selectedDiff;
   $("fx").innerHTML = "";
   $("overlay").classList.add("hidden");
   $("menu-scr").classList.add("hidden");

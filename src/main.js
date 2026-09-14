@@ -1,10 +1,11 @@
 /* ══════════ 入口：DOM 构建、输入绑定、主循环 ══════════ */
 import "./style.css";
 import { $ } from "./util.js";
-import { SKILLS, KEYMAP, DIFFS, S } from "./state.js";
+import { SKILLS, KEYMAP, DIFFS, HEROES, S } from "./state.js";
 import { trySelect, startGame, toMenu, update, handleNetState, handleNetError } from "./engine.js";
 import { SFX, toggleMute, startBgm, isBgmOn } from "./audio.js";
 import { render } from "./render.js";
+import { skinSVG } from "./render.js";
 import * as net from "./net.js";
 
 /* ══════════ 菜单规则表 ══════════ */
@@ -28,6 +29,29 @@ function buildMenu() {
   });
 }
 buildMenu();
+
+/* ══════════ 角色选择构建 ══════════ */
+function buildHeroRow() {
+  const wrap = $("hero-row");
+  HEROES.forEach(h => {
+    const b = document.createElement("button");
+    b.className = "hero-btn";
+    b.dataset.id = h.id;
+    b.innerHTML =
+      '<span class="hm">' + skinSVG(h.id, false) + '</span>' +
+      '<span class="hv">' + h.name + '</span>' +
+      '<span class="ht">' + h.tagline + "</span>";
+    b.addEventListener("click", () => {
+      S.hero = h; SFX.tap(); render();
+      const el = $("hero-desc");
+      if (el) el.textContent = h.desc;
+    });
+    wrap.appendChild(b);
+  });
+  const d = $("hero-desc");
+  if (d) d.textContent = HEROES[0].desc;
+}
+buildHeroRow();
 
 /* ══════════ 技能按钮构建 ══════════ */
 SKILLS.forEach(([name, key, cost, desc]) => {
@@ -182,4 +206,9 @@ function tick(t) {
 }
 requestAnimationFrame(tick);
 
-if (location.hash.startsWith("#game")) startGame();   // 调试用：直接进入游戏画面
+if (location.hash.startsWith("#game")) {
+  // 调试用：#game 直接进入游戏；?hero=xxx 指定我方角色
+  const h = new URLSearchParams(location.search).get("hero");
+  if (h) { const found = HEROES.find(x => x.id === h); if (found) S.hero = found; }
+  startGame();
+}

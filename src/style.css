@@ -121,6 +121,33 @@
     content: ""; position: absolute; right: 7px; top: 7px; width: 7px; height: 7px;
     border-radius: 50%; background: var(--vermil);
   }
+  #hero-label { font-family: var(--f-kai); font-size: 17px; letter-spacing: 4px; color: var(--ink-3); margin-top: 2px; }
+  #hero-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+  .hero-btn {
+    width: 118px; padding: 8px 6px; position: relative;
+    display: flex; flex-direction: column; gap: 3px; align-items: center;
+    border: 1.5px solid rgba(25,23,20,.32); border-radius: 10px;
+    background: rgba(255,255,255,.28); cursor: pointer;
+  }
+  .hero-btn .hm { height: 58px; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .hero-btn .hm svg { height: 58px; width: 51px; display: block; }
+  .hero-btn .hv { font-family: var(--f-shu); font-size: 22px; letter-spacing: 2px; color: var(--ink); }
+  .hero-btn .ht { font-family: var(--f-kai); font-size: 13px; letter-spacing: 2px; color: var(--ink-3); }
+  .hero-btn.hot { background: var(--ink); border-color: var(--ink); box-shadow: 4px 4px 0 rgba(25,23,20,.2); }
+  .hero-btn.hot .hv, .hero-btn.hot .ht { color: var(--paper); }
+  /* 选中态：卡片转墨色底，剪影提亮为宣纸色，朱砂/金描色保留 */
+  .hero-btn.hot .hm svg path, .hero-btn.hot .hm svg circle { fill: var(--paper-2); }
+  .hero-btn.hot .hm svg path[stroke] { fill: none; }
+  .hero-btn.hot .hm svg path[stroke="#A63A2B"] { stroke: var(--vermil); }
+  .hero-btn.hot .hm svg path[stroke="#8A6D3B"] { stroke: var(--gold); }
+  .hero-btn.hot::after {
+    content: ""; position: absolute; right: 7px; top: 7px; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--vermil);
+  }
+  #hero-desc {
+    max-width: 420px; min-height: 18px; margin: 2px auto 0;
+    font-family: var(--f-song); font-size: 12.5px; line-height: 1.5; color: var(--ink-3);
+  }
   #btn-start {
     margin-top: 2px; width: 268px; height: 50px; flex: none;
     font-family: var(--f-shu); font-size: 28px; letter-spacing: 8px;

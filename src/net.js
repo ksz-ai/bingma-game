@@ -38,9 +38,11 @@ export async function moveHash(move, nonce) {
 }
 export function randNonce() { return Math.random().toString(36).slice(2, 12); }
 export function roomCode() { return code; }
+export function peerHeroId() { return peer && !peer.bye ? peer.hero || null : null; }
 
 function freshState(round) {
   return { v: 1, t: Date.now(), tok: token, bye: 0, round,
+           hero: S.hero ? S.hero.id : undefined,
            commit: null, reveal: null, ack: 0 };
 }
 
@@ -284,5 +286,6 @@ function buildState() {
     peerCommit: live ? peer.commit : null,
     myReveal: my ? my.reveal : null,
     peerReveal: live ? peer.reveal : null,
+    peerHero: live ? (peer.hero || null) : null,
   };
 }
