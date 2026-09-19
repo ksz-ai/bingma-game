@@ -188,16 +188,22 @@ function renderFeedback() {
 }
 
 /* ══════════ 剧情模式 UI：目标条 + 对白层 ══════════ */
+const SAFE_POS = { "袖箭": "屋脊或水底", "剑风": "水底", "震山掌": "屋脊" };
 function renderStoryUI() {
-  const bar = $("goal-bar"), dlg = $("dialog");
+  const bar = $("goal-bar");
   if (S.storyMode && S.storyGoal) {
     bar.classList.remove("hidden");
-    bar.querySelector(".g-text").textContent = S.storyGoal.text;
+    let text = S.storyGoal.text;
+    /* 走位关：补一行"本回合躲到水底/屋脊"的实时提示 */
+    if (S.storyGoal.kind === "dodge" && Array.isArray(S.storyScript)) {
+      const sc = S.storyScript.find(x => x.round === S.gs.round);
+      if (sc && SAFE_POS[sc.move] && S.phase === "select") {
+        text += " · 本回合躲到【" + SAFE_POS[sc.move] + "】";
+      }
+    }
+    bar.querySelector(".g-text").textContent = text;
   } else {
     bar.classList.add("hidden");
-  }
-  if (!S.storyMode || S.storyPhase !== "select") {
-    /* 对白可见性由 setDialogAdvance 控制；这里不强制隐藏 */
   }
 }
 

@@ -39,10 +39,21 @@ export function settle(pm, am) {
 
   const raw = S.gs.log.slice(base);
   const combat = raw.filter(x => x.includes("伤") || x.includes("落空") || x.includes("万剑归宗"));
+  /* 实际承受伤害 = 招式伤值 − 我方盾吸收的部分（盾满则被吸收完全归零） */
+  const dmgOf = m => ({ "袖箭": 1, "剑风": 3, "震山掌": 3 })[m] || 0;
+  const hitOf = (side, m) => {
+    const foe = S.gs[side === "player" ? "ai" : "player"];
+    if (m === "袖箭")   return foe.pos === "ground";
+    if (m === "剑风")   return foe.pos === "sky" || foe.pos === "ground";
+    if (m === "震山掌") return foe.pos === "ground" || foe.pos === "underground";
+    return false;
+  };
+  const absorbed = (preShield, dmg) => Math.min(preShield, dmg);
+  const pd = hitOf("ai", am)     ? Math.max(0, dmgOf(am) - absorbed(pS, dmgOf(am))) : 0;
+  const ad = hitOf("player", pm) ? Math.max(0, dmgOf(pm) - absorbed(aS, dmgOf(pm))) : 0;
   S.report = {
     pm, am,
-    pd: Math.max(0, pS - S.gs.player.shield),
-    ad: Math.max(0, aS - S.gs.ai.shield),
+    pd, ad,
     lines: combat.concat(raw.filter(x => !combat.includes(x))),
   };
   S.pending = null;
@@ -255,8 +266,9 @@ export function startStory(idx) {
   S.mode = "game";
   SFX.start();
   /* 自检钩子：每回合结算后判定通关/失败。
-     关键：过程性目标（聚气/走位/命中/护体）未达标时，只要对局尚未结束，
-     就静默进入下一回合继续玩——绝不能当场判失败重开，否则教学关会无限循环。 */
+     关键：过程性目标（聚气/走位/命中/护体）未达标时，只要对局尚未结束、
+     且剧本未走完，就静默进入下一回合继续玩——绝不能当场判失败重开，
+     否则教学关会无限循环。但剧本若已走完仍未达标，则判失败重开。 */
   S.storyResolveHook = () => {
     const result = S.pendingResult;
     const g = S.storyGoal;
@@ -274,6 +286,11 @@ export function startStory(idx) {
         settled = true;
         pass = !!(S.report && S.gs.player.pos === "ground" && S.report.pd === 0 && S.gs.dead.player !== true);
       }
+    }
+    /* 剧本式关卡：当回合超过剧本长度仍未达成 → 判失败（剧本已走完，无悬念） */
+    if (!pass && !settled && Array.isArray(S.storyScript)) {
+      const lastRound = S.storyScript.reduce((m, x) => Math.max(m, x.round), 0);
+      if (S.gs.round >= lastRound) settled = true;
     }
     if (pass) return void setTimeout(passStory, 400);
     if (settled) setTimeout(failStory, 400);   // 对局已结束仍未达标 → 重开本幕
