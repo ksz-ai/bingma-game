@@ -2,7 +2,7 @@
 import "./style.css";
 import { $ } from "./util.js";
 import { SKILLS, KEYMAP, DIFFS, HEROES, S } from "./state.js";
-import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory, getChapters } from "./engine.js";
+import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory, getChapters, enterStoryChapter, showChapter } from "./engine.js";
 import { SFX, toggleMute, startBgm, isBgmOn } from "./audio.js";
 import { render, bindDialogClicks, showDialog } from "./render.js";
 import { skinSVG } from "./render.js";
@@ -120,11 +120,28 @@ function openStoryPicker() {
 $("btn-story").addEventListener("click", openStoryPicker);
 $("sp-close").addEventListener("click", () => $("story-picker").classList.add("hidden"));
 
-/* Esc 关闭关卡面板 */
+/* 章节过场页按钮：返回/入局 */
+function chapterBack() {
+  $("chapter-scr").classList.add("hidden");
+  $("game-scr").classList.add("hidden");
+  $("menu-scr").classList.remove("hidden");
+  openStoryPicker();
+}
+$("ch-enter").addEventListener("click", () => enterStoryChapter(S.storyChapter));
+$("ch-back").addEventListener("click", chapterBack);
+
+/* Esc 关闭关卡面板或返回章节过场 */
 function maybeCloseStoryPicker(e) {
-  if (e.key === "Escape" && !$("story-picker").classList.contains("hidden")) {
-    $("story-picker").classList.add("hidden");
-    e.preventDefault();
+  if (e.key === "Escape") {
+    if (!$("chapter-scr").classList.contains("hidden")) {
+      chapterBack();
+      e.preventDefault();
+      return;
+    }
+    if (!$("story-picker").classList.contains("hidden")) {
+      $("story-picker").classList.add("hidden");
+      e.preventDefault();
+    }
   }
 }
 addEventListener("keydown", maybeCloseStoryPicker);

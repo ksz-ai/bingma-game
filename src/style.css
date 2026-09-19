@@ -850,6 +850,67 @@
 }
 #sp-close { width: 180px; height: 38px; font-size: 15px; margin: 0 auto; display: block; }
 
+/* ══════════ 新手剧情：章节过场页 ══════════ */
+#chapter-scr {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(900px 540px at 30% -10%, rgba(255,255,255,.6), transparent 60%),
+    radial-gradient(700px 500px at 110% 110%, rgba(84,70,48,.18), transparent 62%),
+    var(--paper);
+  z-index: 20;
+}
+#chapter-scr.hidden { display: none; }
+#ch-frame {
+  width: 620px; max-width: 92%;
+  background: rgba(255,253,246,.85); border: 2px solid var(--ink);
+  box-shadow: 6px 6px 0 rgba(25,23,20,.3);
+  padding: 28px 36px 24px;
+  text-align: center;
+}
+#ch-num {
+  font-family: var(--f-kai); font-size: 14px; letter-spacing: 6px; color: var(--vermil);
+  margin-bottom: 6px;
+}
+#ch-title {
+  font-family: var(--f-shu); font-size: 42px; letter-spacing: 10px; color: var(--ink);
+  line-height: 1.1; margin-bottom: 6px;
+}
+#ch-tagline {
+  font-family: var(--f-kai); font-size: 14px; letter-spacing: 4px; color: var(--ink-3);
+  margin-bottom: 14px;
+}
+#ch-rule {
+  border: none; border-top: 1px solid rgba(25,23,20,.25);
+  margin: 12px 0 16px;
+}
+#ch-goal {
+  font-family: var(--f-shu); font-size: 22px; letter-spacing: 4px; color: var(--vermil);
+  margin-bottom: 12px;
+}
+#ch-acts {
+  font-family: var(--f-song); font-size: 13.5px; line-height: 1.85; color: var(--ink-2);
+  max-width: 480px; margin: 0 auto 22px;
+}
+#ch-acts .hl {
+  font-family: var(--f-kai); color: var(--vermil); font-weight: bold;
+  margin: 0 1px;
+}
+#ch-actions {
+  display: flex; gap: 14px; justify-content: center;
+}
+#ch-actions .mbtn { width: 200px; }
+
+@media (max-width: 760px) {
+  #ch-frame { width: 92%; padding: 22px 18px 18px; }
+  #ch-title { font-size: 30px; letter-spacing: 6px; }
+  #ch-tagline { font-size: 12px; letter-spacing: 3px; }
+  #ch-goal { font-size: 18px; letter-spacing: 3px; }
+  #ch-acts { font-size: 12.5px; line-height: 1.7; }
+  #ch-actions { flex-direction: column; gap: 10px; }
+  #ch-actions .mbtn { width: 100%; }
+}
+
 @media (max-width: 760px) {
   #story-picker { width: 92%; padding: 16px 16px 12px; }
   #story-picker .sp-title { font-size: 22px; letter-spacing: 4px; }

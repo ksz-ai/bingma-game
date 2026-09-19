@@ -298,11 +298,45 @@ export function startStory(idx) {
     if (settled) setTimeout(failStory, 400);   // 对局已结束仍未达标 → 重开本幕
     /* 否则：对局未结束 → 静默继续下一回合 */
   };
-  /* 进入：先放幕前对白（intro），点完再开打 / 推进下一幕 */
-  showDialog(ch.intro || [], () => {
-    /* 序幕幕（intro）打完直接结束；其他幕进入战斗回合 */
-    if (ch.type === "dialog") endStoryDialog();
-  });
+  /* 进入：战斗幕先弹章节过场页（关卡标题 + 目标 + 招式要点），玩家按"入局"才真正开打。
+     序幕幕（intro）无战斗，对白结束后由 onDone 自动跳下一幕。 */
+  if (ch.type === "dialog") {
+    $("menu-scr").classList.add("hidden");
+    $("chapter-scr").classList.add("hidden");
+    $("game-scr").classList.remove("hidden");
+    showDialog(ch.lines, () => { if (ch.type === "dialog") endStoryDialog(); });
+    return;
+  }
+  showChapter(idx);
+}
+
+/* 显示章节过场页：关卡标题 + 副标题 + 目标 + 招式要点 */
+export function showChapter(idx) {
+  const ch = CHAPTERS[idx];
+  if (!ch) return;
+  $("menu-scr").classList.add("hidden");
+  $("game-scr").classList.add("hidden");
+  $("story-picker").classList.add("hidden");
+  $("chapter-scr").classList.remove("hidden");
+  $("ch-num").textContent = "第 " + (idx + 1) + " 课";
+  $("ch-title").textContent = ch.title;
+  $("ch-tagline").textContent = ch.tagline || "";
+  $("ch-goal").textContent = ch.goal ? ch.goal.text : "听一段江湖往事";
+  $("ch-acts").innerHTML = ch.acts
+    ? ch.acts.replace(/「/g, '<span class="hl">「').replace(/」/g, '」</span>')
+    : "";
+  render();
+}
+
+/* 从章节过场页进入实际战斗 */
+export function enterStoryChapter(idx) {
+  const ch = CHAPTERS[idx];
+  if (!ch || ch.type !== "combat") return;
+  $("chapter-scr").classList.add("hidden");
+  $("game-scr").classList.remove("hidden");
+  /* 弹幕前对白，点完进入正常 select 阶段 */
+  showDialog(ch.intro, () => { S.phase = "select"; S.timer = S.timerMax; render(); });
+  render();
 }
 
 /* 对白推进的回调：直接交给 render.showDialog */
