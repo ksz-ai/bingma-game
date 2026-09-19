@@ -249,19 +249,30 @@ export function startStory(idx) {
   $("game-scr").classList.remove("hidden");
   S.mode = "game";
   SFX.start();
-  /* 自检钩子：每回合结算后判定 */
+  /* 自检钩子：每回合结算后判定通关/失败。
+     关键：过程性目标（聚气/走位/命中/护体）未达标时，只要对局尚未结束，
+     就静默进入下一回合继续玩——绝不能当场判失败重开，否则教学关会无限循环。 */
   S.storyResolveHook = () => {
     const result = S.pendingResult;
     const g = S.storyGoal;
     if (!g) return;
+    const pm = S.report ? S.report.pm : null;
     let pass = false;
+    let settled = !!result;                 // 对局是否已自然结束（有胜负）
     if (g.kind === "win")            pass = result === "win";
     else if (g.kind === "qi")        pass = S.gs.player.qi >= g.target;
     else if (g.kind === "dodge")     pass = (S.storyDodgeCount || 0) >= g.target;
-    else if (g.kind === "hit")       pass = S.report && S.report.ad > 0;
-    else if (g.kind === "shield_block") pass = S.report && S.report.pd === 0;
-    /* 结算下一幕：pass = true 进结语对白，pass = false 进失败对白（如有） */
-    setTimeout(() => pass ? passStory() : failStory(), 400);
+    else if (g.kind === "hit")       pass = !!(S.report && pm === g.move && S.report.ad > 0);
+    else if (g.kind === "shield_block") {
+      /* 硬接守护：仅当木人本回合真出了目标招（震山掌）才判定——挡下则过，躲开/被杀则重来 */
+      if (S.aiMove === g.move) {
+        settled = true;
+        pass = !!(S.report && S.gs.player.pos === "ground" && S.report.pd === 0 && S.gs.dead.player !== true);
+      }
+    }
+    if (pass) return void setTimeout(passStory, 400);
+    if (settled) setTimeout(failStory, 400);   // 对局已结束仍未达标 → 重开本幕
+    /* 否则：对局未结束 → 静默继续下一回合 */
   };
   /* 进入：先放幕前对白（intro），点完再开打 / 推进下一幕 */
   showDialog(ch.intro || [], () => {

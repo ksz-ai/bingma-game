@@ -154,6 +154,13 @@
     background: var(--ink); color: var(--paper); border-color: var(--ink);
   }
   #btn-start:hover { background: var(--ink-2); box-shadow: 4px 4px 0 rgba(166,58,43,.35); }
+  /* 副按钮：与主按钮同宽，纵向整齐排列 */
+  #btn-story, #btn-pvp {
+    width: 268px; height: 44px; flex: none;
+    font-family: var(--f-kai); font-size: 17px; letter-spacing: 5px;
+    background: transparent; border: 1.5px solid var(--ink-3); color: var(--ink-2);
+  }
+  #btn-story:hover, #btn-pvp:hover { background: rgba(25,23,20,.08); box-shadow: 3px 3px 0 rgba(25,23,20,.22); }
 
   /* ══════════ 游戏：顶部状态卡 ══════════ */
   #game-scr { position: absolute; inset: 0; }
@@ -642,6 +649,7 @@
     #diff-label { font-size: 15px; margin-top: 2px; }
     .diff-btn { width: 88px; height: 40px; font-size: 16px; }
     #btn-start { width: 230px; height: 50px; font-size: 23px; }
+    #btn-story, #btn-pvp { width: 230px; height: 42px; font-size: 15px; }
 
     /* ── 游戏 ── */
     #game-scr {
