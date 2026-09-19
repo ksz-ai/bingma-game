@@ -2,11 +2,14 @@
 import "./style.css";
 import { $ } from "./util.js";
 import { SKILLS, KEYMAP, DIFFS, HEROES, S } from "./state.js";
-import { trySelect, startGame, toMenu, update, handleNetState, handleNetError } from "./engine.js";
+import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory } from "./engine.js";
 import { SFX, toggleMute, startBgm, isBgmOn } from "./audio.js";
-import { render } from "./render.js";
+import { render, bindDialogClicks } from "./render.js";
 import { skinSVG } from "./render.js";
 import * as net from "./net.js";
+import { loadProgress } from "./story.js";
+
+bindDialogClicks();
 
 /* ══════════ 菜单规则表 ══════════ */
 function buildMenu() {
@@ -81,6 +84,21 @@ $("btn-start").addEventListener("click", () => startGame());
 $("btn-retry").addEventListener("click", () => startGame());
 $("btn-menu").addEventListener("click", toMenu);
 $("btn-sound").addEventListener("click", toggleMute);
+
+/* ══════════ 剧情入口：从持久化进度开打 ══════════ */
+function refreshStoryLabel() {
+  const btn = $("btn-story");
+  if (!btn) return;
+  const idx = loadProgress();
+  btn.textContent = idx > 0 ? "续上回 (T)" : "初入兵马 (T)";
+}
+refreshStoryLabel();
+
+function startStoryFromProgress() {
+  const idx = loadProgress();
+  startStory(idx);
+}
+$("btn-story").addEventListener("click", startStoryFromProgress);
 
 /* ══════════ 联机大厅 ══════════ */
 let inLobby = false;
@@ -160,13 +178,24 @@ addEventListener("keydown", e => {
     }
     if (e.key === "s" || e.key === "S" || e.key === "Enter" || e.key === " ") startGame();
     else if (e.key === "n" || e.key === "N") showLobby();
+    else if (e.key === "t" || e.key === "T") startStoryFromProgress();
     else if (e.key === "d" || e.key === "D" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       S.selectedDiff = DIFFS[(DIFFS.indexOf(S.selectedDiff) + 1) % DIFFS.length];
       SFX.tap();
     }
     return;
   }
-  if (e.key === "Escape") { toMenu(); return; }
+  if (e.key === "Escape") {
+    /* 剧情对白显示时：ESC 跳过整段对白（不退出游戏）；否则回菜单 */
+    const dlg = $("dialog");
+    if (S.storyMode && dlg && !dlg.classList.contains("hidden")) {
+      dlg.click();
+      return;
+    }
+    toMenu();
+    refreshStoryLabel();
+    return;
+  }
   if (S.result) {
     if (e.key === "r" || e.key === "R") startGame();
     else if (e.key === "m" || e.key === "M") toMenu();

@@ -3,7 +3,7 @@ import { ACTIONS, SKILLS, S } from "./state.js";
 import { pick } from "./util.js";
 
 export function aiChoose() {
-  const d = S.selectedDiff, qi = () => S.gs.ai.qi;
+  const d = S.storyMode ? (S.storyAiDiff || "简单") : S.selectedDiff, qi = () => S.gs.ai.qi;
   const pq = S.gs.player.qi, pp = S.gs.player.pos, ash = S.gs.ai.shield;
   const afford = names => names.filter(n => qi() >= ACTIONS[n].cost);
 

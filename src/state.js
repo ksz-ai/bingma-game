@@ -58,6 +58,10 @@ export const S = {
   // 联机
 	  myNonce: null, revealSent: false, peerStaleSince: 0, netErr: 0,
 	  pvpJoinTime: 0, isReconnecting: false,
+	  // 剧情
+	  storyMode: false, storyChapter: 0, storyScript: null, storyScriptIdx: 0,
+	  storyGoal: null, storyAi: null, storySolve: null, storyAiDiff: "简单",
+	  storyResolveHook: null,                 // 结算后剧情自检回调
 };
 
 export function setFeedback(msg, dur = 1.2) { S.fbMsg = msg; S.fbUntil = now() + dur; }

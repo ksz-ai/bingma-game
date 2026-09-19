@@ -1,6 +1,7 @@
 /* ══════════ 流程引擎：选招 → 等待 → 结算 → 揭晓 → 结束 ══════════
    pve：等待 0.7s 后本地 AI 出招并结算
-   pvp：出招即发承诺哈希，等对手也承诺后亮牌，双方各收招式本地结算（纯函数，结果一致） */
+   pvp：出招即发承诺哈希，等对手也承诺后亮牌，双方各收招式本地结算（纯函数，结果一致）
+   story：剧情模式，对手按章节脚本出招，达到目标即过关，结算后剧情自检 */
 import { $, now } from "./util.js";
 import { ACTIONS, HEROES, heroById, heroCost, ROUND_TIME, WAIT_TIME, REVEAL_TIME, PVP_ROUND_TIME, S, setFeedback, newState, logMsg } from "./state.js";
 import { resolveCombat } from "./settle.js";
@@ -8,8 +9,13 @@ import { aiChoose } from "./ai.js";
 import { skillSound, SFX, thud, clang, startBgm, stopBgm } from "./audio.js";
 import { spawnDmgFx, spawnSkillFx, fxClash, FX_DUR } from "./fx.js";
 import * as net from "./net.js";
+import { CHAPTERS, loadProgress, saveProgress } from "./story.js";
+import { showDialog as renderShowDialog } from "./render.js";
 
 export function trySelect(name) {
+  /* 剧情对白显示时禁止出招 */
+  const dlg = document.getElementById("dialog");
+  if (dlg && !dlg.classList.contains("hidden")) return;
   if (S.pending !== null) { setFeedback("招式已定，静待分晓…"); return; }
   const cost = heroCost(S.gs.player.hero, name);
   if (S.gs.player.qi < cost) { setFeedback(name + "需 " + cost + " 点气！"); SFX.invalid(); return; }
@@ -56,6 +62,11 @@ export function settle(pm, am) {
   S.revealDur = S.pendingResult ? fxDur + 0.15 : Math.max(REVEAL_TIME, fxDur);
   S.phase = "reveal";
   S.revealStart = now();
+  /* 剧情自检：判定过关/失败，仅在 storyMode 触发 */
+  if (S.storyMode) storyCheckDodge();
+  if (S.storyMode && S.storyResolveHook) {
+    setTimeout(() => S.storyResolveHook && S.storyResolveHook(), 60);
+  }
 }
 
 function nextRoundReset(round) {
@@ -74,7 +85,7 @@ export function update(dt) {
       trySelect("吐纳");
     }
   } else if (S.phase === "waiting" && S.gameMode === "pve") {
-    if (now() - S.waitStart >= WAIT_TIME) settle(S.pending, aiChoose());
+    if (now() - S.waitStart >= WAIT_TIME) settle(S.pending, storyMove() || aiChoose());
   } else if (S.phase === "waiting" && S.gameMode === "pvp") {
     if (now() - S.waitStart > 90) return pvpAbort("对手迟迟未出招，已返回客栈");
   } else if (S.phase === "reveal") {
@@ -196,9 +207,148 @@ export function startGame(mode = "pve") {
   SFX.start();
 }
 
+/* ══════════ 剧情模式 ══════════
+   startStory(idx)：进入第 idx 幕（0 序幕，1 一课，... 5 结业）。
+   序幕（intro）直接走对白；其余幕走真实战斗，结算后自检过关。
+   storyMove()：waiting 阶段从脚本取出本回合对手招式。
+   advanceStory()：对白点按时推进 */
+export function startStory(idx) {
+  const ch = CHAPTERS[idx];
+  if (!ch) return toMenu();
+  stopBgm();
+  S.storyMode = true;
+  S.storyChapter = idx;
+  S.storyScript = Array.isArray(ch.script) ? ch.script : null;
+  S.storyScriptIdx = 0;
+  S.storyAiDiff = (ch.ai && ch.ai.diff) || "简单";
+  S.storyAi = ch.script === "ai";
+  S.storyGoal = ch.goal || null;
+  S.storySolve = ch.solve || null;
+  S.storyDodgeCount = 0;
+  S.gameMode = "pve";
+  S.timerMax = ch.roundTime || ROUND_TIME;
+  const ph = S.hero;
+  const ah = ch.type === "combat" ? HEROES[0] : HEROES[0];   // 木人占位用首个标准角色
+  S.gs = newState(ph, ah);
+  if (ch.startPlayer) {
+    S.gs.player.qi = ch.startPlayer.qi;
+    S.gs.player.shield = ch.startPlayer.shield;
+    S.gs.player.pos = ch.startPlayer.pos;
+  }
+  S.phase = "select"; S.pending = null; S.aiMove = null;
+  S.timer = S.timerMax; S.report = null; S.result = null; S.fbMsg = null;
+  S.pendingResult = null; S.revealDur = REVEAL_TIME;
+  S.clashed = false;
+  S.cancelled = { player: false, ai: false };
+  S.myNonce = null; S.revealSent = false; S.peerStaleSince = 0; S.netErr = 0;
+  $("p-name").textContent = ph.name + " · 你";
+  $("ai-name").textContent = ch.title || "木人";
+  $("fx").innerHTML = "";
+  $("overlay").classList.add("hidden");
+  $("menu-scr").classList.add("hidden");
+  $("game-scr").classList.remove("hidden");
+  S.mode = "game";
+  SFX.start();
+  /* 自检钩子：每回合结算后判定 */
+  S.storyResolveHook = () => {
+    const result = S.pendingResult;
+    const g = S.storyGoal;
+    if (!g) return;
+    let pass = false;
+    if (g.kind === "win")            pass = result === "win";
+    else if (g.kind === "qi")        pass = S.gs.player.qi >= g.target;
+    else if (g.kind === "dodge")     pass = (S.storyDodgeCount || 0) >= g.target;
+    else if (g.kind === "hit")       pass = S.report && S.report.ad > 0;
+    else if (g.kind === "shield_block") pass = S.report && S.report.pd === 0;
+    /* 结算下一幕：pass = true 进结语对白，pass = false 进失败对白（如有） */
+    setTimeout(() => pass ? passStory() : failStory(), 400);
+  };
+  /* 进入：先放幕前对白（intro），点完再开打 / 推进下一幕 */
+  showDialog(ch.intro || [], () => {
+    /* 序幕幕（intro）打完直接结束；其他幕进入战斗回合 */
+    if (ch.type === "dialog") endStoryDialog();
+  });
+}
+
+/* 对白推进的回调：直接交给 render.showDialog */
+function showDialog(lines, onDone) {
+  renderShowDialog(lines, onDone);
+}
+function endStoryDialog() {
+  /* 序幕幕：对白结束 → 直接跳下一幕（或回菜单，已通关） */
+  const next = S.storyChapter + 1;
+  if (next < CHAPTERS.length) {
+    saveProgress(next);
+    startStory(next);
+  } else {
+    saveProgress(CHAPTERS.length);
+    S.storyMode = false;
+    setFeedback("五课已毕，江湖路自此开启", 2.4);
+    toMenu();
+  }
+}
+function passStory() {
+  const ch = CHAPTERS[S.storyChapter];
+  /* 进阶：对白结束后升级进度 */
+  const next = S.storyChapter + 1;
+  saveProgress(Math.max(next, S.storyChapter + 1));
+  const lines = [];
+  if (ch.pass)  lines.push(ch.pass);
+  if (ch.pass2) lines.push(ch.pass2);
+  if (ch.pass3) lines.push(ch.pass3);
+  showDialog(lines, () => {
+    if (next < CHAPTERS.length) startStory(next);
+    else { S.storyMode = false; setFeedback("五课已毕，江湖路自此开启", 2.4); toMenu(); }
+  });
+}
+function failStory() {
+  const ch = CHAPTERS[S.storyChapter];
+  if (ch.fail) {
+    showDialog([ch.fail], () => {
+      /* 失败不重置整场，简化处理：重开本幕 */
+      startStory(S.storyChapter);
+    });
+  } else {
+    /* 没有失败对白（如一课聚气）直接重开 */
+    startStory(S.storyChapter);
+  }
+}
+
+/* 剧情每回合对手出招：脚本模式按表查找，AI 模式返回 null（让 aiChoose 接手） */
+export function storyMove() {
+  if (!S.storyMode) return null;
+  if (S.storyAi) return null;
+  const r = S.gs.round;
+  const sc = (S.storyScript || []).find(x => x.round === r);
+  if (!sc) return null;
+  /* 举牌告示作为本回合第一条 log（在该回合首次 renderLog 时显示） */
+  if (sc.banner) {
+    S.gs.log.push("【" + sc.banner + "】");
+  }
+  return sc.move;
+}
+
+/* 剧情二课走位：玩家位置须落在 avoid 集合之外，记一次成功躲避 */
+export function storyCheckDodge() {
+  if (!S.storyMode) return;
+  if (S.storyGoal && S.storyGoal.kind === "dodge") {
+    const sc = (S.storyScript || []).find(x => x.round === S.gs.round);
+    if (!sc) return;
+    const aiMove = sc.move;
+    /* 落点：袖箭仅中平地、剑风扫屋脊+平地、震山掌扫平地+水底 → 玩家存活即躲掉 */
+    if (aiMove === "袖箭" && S.gs.player.pos !== "ground") S.storyDodgeCount = (S.storyDodgeCount || 0) + 1;
+    else if (aiMove === "剑风" && S.gs.player.pos !== "sky" && S.gs.player.pos !== "ground") S.storyDodgeCount = (S.storyDodgeCount || 0) + 1;
+    else if (aiMove === "震山掌" && S.gs.player.pos !== "ground" && S.gs.player.pos !== "underground") S.storyDodgeCount = (S.storyDodgeCount || 0) + 1;
+  }
+}
+
+export function getStoryProgress() { return loadProgress(); }
+export function getChapters() { return CHAPTERS; }
+
 export function toMenu() {
   if (S.gameMode === "pvp") net.leaveRoom();
   S.mode = "menu"; S.result = null; S.gameMode = "pve";
+  S.storyMode = false;
   $("overlay").classList.add("hidden");
   $("game-scr").classList.add("hidden");
   $("menu-scr").classList.remove("hidden");

@@ -187,6 +187,46 @@ function renderFeedback() {
   } else el.style.opacity = 0;
 }
 
+/* ══════════ 剧情模式 UI：目标条 + 对白层 ══════════ */
+function renderStoryUI() {
+  const bar = $("goal-bar"), dlg = $("dialog");
+  if (S.storyMode && S.storyGoal) {
+    bar.classList.remove("hidden");
+    bar.querySelector(".g-text").textContent = S.storyGoal.text;
+  } else {
+    bar.classList.add("hidden");
+  }
+  if (!S.storyMode || S.storyPhase !== "select") {
+    /* 对白可见性由 setDialogAdvance 控制；这里不强制隐藏 */
+  }
+}
+
+let dialogLines = [], dialogOnDone = null, dialogIdx = -1;
+export function showDialog(lines, onDone) {
+  dialogLines = lines || [];
+  dialogOnDone = onDone || null;
+  dialogIdx = -1;
+  advanceDialog();
+}
+function advanceDialog() {
+  dialogIdx++;
+  if (dialogIdx >= dialogLines.length) {
+    $("dialog").classList.add("hidden");
+    const cb = dialogOnDone; dialogOnDone = null;
+    cb && cb();
+    return;
+  }
+  const ln = dialogLines[dialogIdx];
+  $("dialog").classList.remove("hidden");
+  $("dialog").querySelector(".dlg-who").textContent = ln.who || "";
+  $("dialog").querySelector(".dlg-text").textContent = ln.text || "";
+}
+export function bindDialogClicks() {
+  const dlg = $("dialog");
+  if (!dlg) return;
+  dlg.addEventListener("click", () => advanceDialog());
+}
+
 export function render() {
   if (S.mode === "menu") {
     document.querySelectorAll(".diff-btn").forEach(b =>
@@ -201,4 +241,5 @@ export function render() {
   renderSkills();
   renderLog();
   renderFeedback();
+  renderStoryUI();
 }

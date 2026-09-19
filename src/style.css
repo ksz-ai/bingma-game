@@ -781,3 +781,60 @@
   #lobby-title { font-size: 40px; letter-spacing: 10px; }
   #room-code { font-size: 42px; letter-spacing: 8px; text-indent: 8px; }
 }
+
+/* ══════════ 新手剧情：目标条 + 水墨对白 ══════════ */
+#goal-bar {
+  position: absolute; left: 170px; bottom: 24px; width: 460px; height: 28px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: rgba(255,253,246,.7); border: 1px solid var(--gold); border-radius: 2px;
+  font-family: var(--f-kai); font-size: 14px; letter-spacing: 2px; color: var(--ink-2);
+  z-index: 12;
+}
+#goal-bar .g-label {
+  font-family: var(--f-shu); font-size: 17px; color: var(--vermil); letter-spacing: 3px;
+}
+#goal-bar .g-text { color: var(--ink-2); }
+
+#dialog {
+  position: absolute; inset: 0; background: rgba(20,18,14,.42);
+  display: flex; align-items: flex-end; justify-content: center;
+  z-index: 35; padding-bottom: 56px;
+}
+#dialog.hidden { display: none; }
+.dlg-card {
+  width: 540px; max-width: 92%;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  box-shadow: 5px 5px 0 rgba(25,23,20,.3);
+  padding: 18px 24px 16px;
+  font-family: var(--f-kai); color: var(--ink);
+  position: relative;
+}
+.dlg-card::before, .dlg-card::after {
+  content: ""; position: absolute; width: 16px; height: 16px;
+}
+.dlg-card::before { left: 6px; top: 6px; border-left: 2px solid var(--ink-3); border-top: 2px solid var(--ink-3); }
+.dlg-card::after  { right: 6px; bottom: 6px; border-right: 2px solid var(--ink-3); border-bottom: 2px solid var(--ink-3); }
+.dlg-who {
+  font-family: var(--f-shu); font-size: 22px; letter-spacing: 4px; color: var(--vermil);
+  margin-bottom: 6px;
+}
+.dlg-text {
+  font-family: var(--f-song); font-size: 16px; line-height: 1.85; color: var(--ink);
+  letter-spacing: 1px; min-height: 30px;
+}
+.dlg-foot {
+  margin-top: 10px; text-align: right;
+  font-family: var(--f-kai); font-size: 12.5px; letter-spacing: 3px; color: var(--ink-4);
+  animation: dlgPulse 1.6s ease-in-out infinite;
+}
+@keyframes dlgPulse { 50% { opacity: .35; } }
+
+@media (max-width: 760px) {
+  #goal-bar { left: 10px; right: 10px; width: auto; bottom: 4px; font-size: 12.5px; }
+  #goal-bar .g-label { font-size: 14px; }
+  #dialog { padding-bottom: 24px; }
+  .dlg-card { padding: 14px 18px 12px; }
+  .dlg-who { font-size: 18px; }
+  .dlg-text { font-size: 14.5px; line-height: 1.7; }
+}
