@@ -2,9 +2,9 @@
 import "./style.css";
 import { $ } from "./util.js";
 import { SKILLS, KEYMAP, DIFFS, HEROES, S } from "./state.js";
-import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory } from "./engine.js";
+import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory, getChapters } from "./engine.js";
 import { SFX, toggleMute, startBgm, isBgmOn } from "./audio.js";
-import { render, bindDialogClicks } from "./render.js";
+import { render, bindDialogClicks, showDialog } from "./render.js";
 import { skinSVG } from "./render.js";
 import * as net from "./net.js";
 import { loadProgress } from "./story.js";
@@ -85,20 +85,49 @@ $("btn-retry").addEventListener("click", () => startGame());
 $("btn-menu").addEventListener("click", toMenu);
 $("btn-sound").addEventListener("click", toggleMute);
 
-/* ══════════ 剧情入口：从持久化进度开打 ══════════ */
-function refreshStoryLabel() {
-  const btn = $("btn-story");
-  if (!btn) return;
-  const idx = loadProgress();
-  btn.textContent = idx > 0 ? "续上回 (T)" : "初入兵马 (T)";
+/* ══════════ 剧情入口：关卡选择面板 ══════════
+   点「初入兵马」不再直接开打，而是弹面板选具体关卡；
+   持久化进度用于解锁（已通关即视为解锁），未通关关卡灰显不能点。 */
+function openStoryPicker() {
+  const picker = $("story-picker");
+  const grid = $("sp-grid");
+  grid.innerHTML = "";
+  const progress = loadProgress();        // 已通关的最高章节编号（CHAPTERS.length 表示全通关）
+  const chapters = getChapters();
+  chapters.forEach((ch, idx) => {
+    const card = document.createElement("button");
+    card.className = "sp-card";
+    const unlocked = idx === 0 || idx < progress;
+    const passed = idx < progress;
+    if (!unlocked) card.classList.add("locked");
+    if (passed) card.classList.add("passed");
+    const goal = ch.goal ? ch.goal.text : (ch.type === "dialog" ? "听一段江湖往事" : "自由对弈");
+    card.innerHTML =
+      '<span class="sp-check">✓</span>' +
+      '<span class="sp-name">' + ch.title + '</span>' +
+      '<span class="sp-goal">' + goal + '</span>';
+    card.disabled = !unlocked;
+    card.addEventListener("click", () => {
+      if (card.disabled) return;
+      picker.classList.add("hidden");
+      startStory(idx);
+    });
+    grid.appendChild(card);
+  });
+  picker.classList.remove("hidden");
+  SFX.tap();
 }
-refreshStoryLabel();
+$("btn-story").addEventListener("click", openStoryPicker);
+$("sp-close").addEventListener("click", () => $("story-picker").classList.add("hidden"));
 
-function startStoryFromProgress() {
-  const idx = loadProgress();
-  startStory(idx);
+/* Esc 关闭关卡面板 */
+function maybeCloseStoryPicker(e) {
+  if (e.key === "Escape" && !$("story-picker").classList.contains("hidden")) {
+    $("story-picker").classList.add("hidden");
+    e.preventDefault();
+  }
 }
-$("btn-story").addEventListener("click", startStoryFromProgress);
+addEventListener("keydown", maybeCloseStoryPicker);
 
 /* ══════════ 联机大厅 ══════════ */
 let inLobby = false;
@@ -178,7 +207,7 @@ addEventListener("keydown", e => {
     }
     if (e.key === "s" || e.key === "S" || e.key === "Enter" || e.key === " ") startGame();
     else if (e.key === "n" || e.key === "N") showLobby();
-    else if (e.key === "t" || e.key === "T") startStoryFromProgress();
+    else if (e.key === "t" || e.key === "T") openStoryPicker();
     else if (e.key === "d" || e.key === "D" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       S.selectedDiff = DIFFS[(DIFFS.indexOf(S.selectedDiff) + 1) % DIFFS.length];
       SFX.tap();
@@ -193,7 +222,6 @@ addEventListener("keydown", e => {
       return;
     }
     toMenu();
-    refreshStoryLabel();
     return;
   }
   if (S.result) {

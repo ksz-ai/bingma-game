@@ -390,6 +390,8 @@ export function toMenu() {
   $("overlay").classList.add("hidden");
   $("game-scr").classList.add("hidden");
   $("menu-scr").classList.remove("hidden");
+  const sp = document.getElementById("story-picker");
+  if (sp) sp.classList.add("hidden");
   SFX.tap();
   startBgm();
 }
