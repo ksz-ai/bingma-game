@@ -56,28 +56,35 @@
     <button id="btn-start" class="mbtn">拔剑开战 (S)</button>
     <button id="btn-story" class="mbtn ghost">初入兵马 (T)</button>
     <button id="btn-pvp" class="mbtn ghost">联机对战 (N)</button>
-    <div id="story-picker" class="hidden">
-      <div class="sp-title">选 一 课</div>
-      <div class="sp-hint">已通关的关卡会盖朱砂印，可随意点击重温。</div>
-      <div id="sp-grid"></div>
-      <button id="sp-close" class="mbtn ghost sp-close">返 回 (Esc)</button>
-    </div>
   </section>
 
-  <!-- 章节过场：关卡标题 + 入局/返回 -->
-  <section id="chapter-scr" class="hidden">
-    <div id="ch-frame">
-      <div id="ch-num"></div>
-      <div id="ch-title"></div>
-      <div id="ch-tagline"></div>
-      <hr id="ch-rule">
-      <div id="ch-goal"></div>
-      <div id="ch-acts"></div>
-      <div id="ch-actions">
-        <button id="ch-enter" class="mbtn">入 局 (Enter)</button>
-        <button id="ch-back" class="mbtn ghost">返 回 (Esc)</button>
-      </div>
-    </div>
+  <!-- 新手剧情：独立界面（左关卡列表 / 右关卡详情 + 入局） -->
+  <section id="story-scr" class="hidden">
+    <header id="story-hd">
+      <button id="story-back" class="mbtn ghost back-btn">返 回 主 菜 单 (Esc)</button>
+      <h2 id="story-hd-title">初 入 兵 马</h2>
+      <div id="story-hd-spacer"></div>
+    </header>
+    <main id="story-main">
+      <aside id="story-side">
+        <div class="side-title">关 · 卡</div>
+        <ul id="story-chap-list"></ul>
+      </aside>
+      <section id="story-detail">
+        <div id="sd-frame">
+          <div id="sd-num"></div>
+          <div id="sd-title"></div>
+          <div id="sd-tagline"></div>
+          <hr id="sd-rule">
+          <div id="sd-goal"></div>
+          <div id="sd-acts"></div>
+          <div id="sd-actions">
+            <button id="sd-enter" class="mbtn">入 局 (Enter)</button>
+            <button id="sd-cleared" class="mbtn ghost" style="display:none">复 通 此 关</button>
+          </div>
+        </div>
+      </section>
+    </main>
   </section>
 
   <!-- 联机大厅 -->

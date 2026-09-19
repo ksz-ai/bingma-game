@@ -2,7 +2,7 @@
 import "./style.css";
 import { $ } from "./util.js";
 import { SKILLS, KEYMAP, DIFFS, HEROES, S } from "./state.js";
-import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory, getChapters, enterStoryChapter, showChapter } from "./engine.js";
+import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory, getChapters, enterStoryChapter, storyBack } from "./engine.js";
 import { SFX, toggleMute, startBgm, isBgmOn } from "./audio.js";
 import { render, bindDialogClicks, showDialog } from "./render.js";
 import { skinSVG } from "./render.js";
@@ -85,66 +85,31 @@ $("btn-retry").addEventListener("click", () => startGame());
 $("btn-menu").addEventListener("click", toMenu);
 $("btn-sound").addEventListener("click", toggleMute);
 
-/* ══════════ 剧情入口：关卡选择面板 ══════════
-   点「初入兵马」不再直接开打，而是弹面板选具体关卡；
-   持久化进度用于解锁（已通关即视为解锁），未通关关卡灰显不能点。 */
-function openStoryPicker() {
-  const picker = $("story-picker");
-  const grid = $("sp-grid");
-  grid.innerHTML = "";
-  const progress = loadProgress();        // 已通关的最高章节编号（CHAPTERS.length 表示全通关）
-  const chapters = getChapters();
-  chapters.forEach((ch, idx) => {
-    const card = document.createElement("button");
-    card.className = "sp-card";
-    const unlocked = idx === 0 || idx < progress;
-    const passed = idx < progress;
-    if (!unlocked) card.classList.add("locked");
-    if (passed) card.classList.add("passed");
-    const goal = ch.goal ? ch.goal.text : (ch.type === "dialog" ? "听一段江湖往事" : "自由对弈");
-    card.innerHTML =
-      '<span class="sp-check">✓</span>' +
-      '<span class="sp-name">' + ch.title + '</span>' +
-      '<span class="sp-goal">' + goal + '</span>';
-    card.disabled = !unlocked;
-    card.addEventListener("click", () => {
-      if (card.disabled) return;
-      picker.classList.add("hidden");
-      startStory(idx);
-    });
-    grid.appendChild(card);
-  });
-  picker.classList.remove("hidden");
-  SFX.tap();
-}
-$("btn-story").addEventListener("click", openStoryPicker);
-$("sp-close").addEventListener("click", () => $("story-picker").classList.add("hidden"));
+/* ══════════ 剧情入口：独立路由界面 ══════════ */
+$("btn-story").addEventListener("click", () => startStory(0));
+$("story-back").addEventListener("click", storyBack);
+$("sd-enter").addEventListener("click", () => enterStoryChapter(S.storyChapter));
 
-/* 章节过场页按钮：返回/入局 */
-function chapterBack() {
-  $("chapter-scr").classList.add("hidden");
-  $("game-scr").classList.add("hidden");
-  $("menu-scr").classList.remove("hidden");
-  openStoryPicker();
-}
-$("ch-enter").addEventListener("click", () => enterStoryChapter(S.storyChapter));
-$("ch-back").addEventListener("click", chapterBack);
-
-/* Esc 关闭关卡面板或返回章节过场 */
-function maybeCloseStoryPicker(e) {
-  if (e.key === "Escape") {
-    if (!$("chapter-scr").classList.contains("hidden")) {
-      chapterBack();
-      e.preventDefault();
-      return;
-    }
-    if (!$("story-picker").classList.contains("hidden")) {
-      $("story-picker").classList.add("hidden");
+/* Esc / Enter 在故事界面里支持快捷键 */
+function onStoryKey(e) {
+  if ($("story-scr").classList.contains("hidden")) return;
+  if (e.key === "Escape") { storyBack(); e.preventDefault(); return; }
+  if (e.key === "Enter") { enterStoryChapter(S.storyChapter); e.preventDefault(); return; }
+  /* 上下方向键切换关卡 */
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+    const all = Array.from(document.querySelectorAll("#story-chap-list .sch"));
+    const cur = all.findIndex(el => el.classList.contains("active"));
+    if (cur === -1) return;
+    let next = cur + (e.key === "ArrowDown" ? 1 : -1);
+    next = Math.max(0, Math.min(all.length - 1, next));
+    const nextIdx = parseInt(all[next].dataset.idx, 10);
+    if (nextIdx >= 0 && !all[next].classList.contains("locked")) {
+      all[next].click();
       e.preventDefault();
     }
   }
 }
-addEventListener("keydown", maybeCloseStoryPicker);
+addEventListener("keydown", onStoryKey);
 
 /* ══════════ 联机大厅 ══════════ */
 let inLobby = false;
@@ -224,7 +189,7 @@ addEventListener("keydown", e => {
     }
     if (e.key === "s" || e.key === "S" || e.key === "Enter" || e.key === " ") startGame();
     else if (e.key === "n" || e.key === "N") showLobby();
-    else if (e.key === "t" || e.key === "T") openStoryPicker();
+    else if (e.key === "t" || e.key === "T") startStory(0);
     else if (e.key === "d" || e.key === "D" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       S.selectedDiff = DIFFS[(DIFFS.indexOf(S.selectedDiff) + 1) % DIFFS.length];
       SFX.tap();

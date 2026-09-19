@@ -298,41 +298,89 @@ export function startStory(idx) {
     if (settled) setTimeout(failStory, 400);   // 对局已结束仍未达标 → 重开本幕
     /* 否则：对局未结束 → 静默继续下一回合 */
   };
-  /* 进入：战斗幕先弹章节过场页（关卡标题 + 目标 + 招式要点），玩家按"入局"才真正开打。
-     序幕幕（intro）无战斗，对白结束后由 onDone 自动跳下一幕。 */
+  /* 章节流程：
+     - 纯对白幕（序幕）：弹对白，点完直接跳下一幕
+     - 战斗幕：先把故事界面打开（左侧关卡列表 + 右侧详情卡），玩家按"入局"才进入游戏屏 */
   if (ch.type === "dialog") {
     $("menu-scr").classList.add("hidden");
-    $("chapter-scr").classList.add("hidden");
+    $("chapter-scr")?.classList.add("hidden");
     $("game-scr").classList.remove("hidden");
     showDialog(ch.lines, () => { if (ch.type === "dialog") endStoryDialog(); });
     return;
   }
-  showChapter(idx);
+  openStoryScreen();
+  selectStoryChapter(idx);
 }
 
-/* 显示章节过场页：关卡标题 + 副标题 + 目标 + 招式要点 */
-export function showChapter(idx) {
-  const ch = CHAPTERS[idx];
-  if (!ch) return;
+/* ══════════ 故事界面（独立路由） ══════════ */
+let storySelectedIdx = 0;
+
+function openStoryScreen() {
   $("menu-scr").classList.add("hidden");
   $("game-scr").classList.add("hidden");
-  $("story-picker").classList.add("hidden");
-  $("chapter-scr").classList.remove("hidden");
-  $("ch-num").textContent = "第 " + (idx + 1) + " 课";
-  $("ch-title").textContent = ch.title;
-  $("ch-tagline").textContent = ch.tagline || "";
-  $("ch-goal").textContent = ch.goal ? ch.goal.text : "听一段江湖往事";
-  $("ch-acts").innerHTML = ch.acts
-    ? ch.acts.replace(/「/g, '<span class="hl">「').replace(/」/g, '」</span>')
-    : "";
-  render();
+  $("chapter-scr")?.classList.add("hidden");
+  $("story-scr").classList.remove("hidden");
+  buildStoryChapterList();
 }
 
-/* 从章节过场页进入实际战斗 */
+function buildStoryChapterList() {
+  const ul = $("story-chap-list");
+  if (!ul) return;
+  ul.innerHTML = "";
+  const progress = loadProgress();
+  getChapters().forEach((ch, idx) => {
+    const li = document.createElement("li");
+    li.className = "sch";
+    const unlocked = idx === 0 || idx < progress;
+    const passed = idx < progress;
+    if (!unlocked) li.classList.add("locked");
+    li.dataset.idx = String(idx);
+    li.innerHTML =
+      '<span class="sch-name">' + ch.title + '</span>' +
+      '<span class="sch-status">' + (passed ? "已过" : (unlocked ? "" : "未开")) + '</span>';
+    li.addEventListener("click", () => {
+      if (li.classList.contains("locked")) return;
+      selectStoryChapter(idx);
+    });
+    ul.appendChild(li);
+  });
+}
+
+function selectStoryChapter(idx) {
+  storySelectedIdx = idx;
+  S.storyChapter = idx;
+  /* 视觉高亮当前选中 */
+  document.querySelectorAll("#story-chap-list .sch").forEach((el, i) => {
+    el.classList.toggle("active", i === idx);
+  });
+  /* 渲染右侧详情 */
+  const ch = getChapters()[idx];
+  if (!ch) return;
+  $("sd-num").textContent = "第 " + (idx + 1) + " 课";
+  $("sd-title").textContent = ch.title;
+  $("sd-tagline").textContent = ch.tagline || "";
+  $("sd-goal").textContent = ch.goal ? ch.goal.text : "听一段江湖往事";
+  $("sd-acts").innerHTML = ch.acts
+    ? ch.acts.replace(/「/g, '<span class="hl">「').replace(/」/g, '」</span>')
+    : "";
+  /* 入局按钮：未通关或已通关都可点（已通关显示"复通此关"） */
+  const passed = idx < loadProgress();
+  const enterBtn = $("sd-enter");
+  enterBtn.textContent = passed ? "复 通 此 关 (Enter)" : "入 局 (Enter)";
+}
+
+export function storyBack() {
+  $("story-scr").classList.add("hidden");
+  $("menu-scr").classList.remove("hidden");
+}
+
+/* 从故事界面"入局/复通此关"按钮进入实际战斗 */
 export function enterStoryChapter(idx) {
-  const ch = CHAPTERS[idx];
+  const ch = getChapters()[idx];
   if (!ch || ch.type !== "combat") return;
-  $("chapter-scr").classList.add("hidden");
+  /* 复通此关：先把进度重置回 idx，避免再次复通后无法继续下一关 */
+  if (idx < loadProgress()) saveProgress(idx);
+  $("story-scr").classList.add("hidden");
   $("game-scr").classList.remove("hidden");
   /* 弹幕前对白，点完进入正常 select 阶段 */
   showDialog(ch.intro, () => { S.phase = "select"; S.timer = S.timerMax; render(); });
@@ -426,6 +474,8 @@ export function toMenu() {
   $("menu-scr").classList.remove("hidden");
   const sp = document.getElementById("story-picker");
   if (sp) sp.classList.add("hidden");
+  const ss = document.getElementById("story-scr");
+  if (ss) ss.classList.add("hidden");
   SFX.tap();
   startBgm();
 }
