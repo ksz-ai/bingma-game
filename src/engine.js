@@ -89,8 +89,10 @@ function nextRoundReset(round) {
 
 export function update(dt) {
   if (S.result) return;
+  /* 剧情对白显示时暂停游戏计时——对白点完才开始倒计时 */
+  const dlgOpen = S.storyMode && !document.getElementById("dialog").classList.contains("hidden");
   if (S.phase === "select") {
-    S.timer -= dt;
+    if (!dlgOpen) S.timer -= dt;
     if (S.timer <= 0) {
       setFeedback("犹豫败北，自动吐纳");
       trySelect("吐纳");
