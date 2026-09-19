@@ -235,6 +235,11 @@ export function startStory(idx) {
     S.gs.player.shield = ch.startPlayer.shield;
     S.gs.player.pos = ch.startPlayer.pos;
   }
+  if (ch.startAi) {
+    S.gs.ai.qi = ch.startAi.qi;
+    S.gs.ai.shield = ch.startAi.shield;
+    S.gs.ai.pos = ch.startAi.pos;
+  }
   S.phase = "select"; S.pending = null; S.aiMove = null;
   S.timer = S.timerMax; S.report = null; S.result = null; S.fbMsg = null;
   S.pendingResult = null; S.revealDur = REVEAL_TIME;
@@ -336,7 +341,10 @@ export function storyMove() {
   if (sc.banner) {
     S.gs.log.push("【" + sc.banner + "】");
   }
-  return sc.move;
+  /* 兜底：脚本招气不足时回退吐纳，绝不"没气硬放大招" */
+  const aiMove = sc.move;
+  if (heroCost(S.gs.ai.hero, aiMove) > S.gs.ai.qi) return "吐纳";
+  return aiMove;
 }
 
 /* 剧情二课走位：玩家位置须落在 avoid 集合之外，记一次成功躲避 */

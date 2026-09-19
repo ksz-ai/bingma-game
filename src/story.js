@@ -45,6 +45,8 @@ export const CHAPTERS = [
     goal: { text: "走位 · 看牌避险，连躲两招", kind: "dodge", target: 2 },
     roundTime: 14,
     startPlayer: { qi: 0, shield: 0, pos: "ground" },
+    /* 木人本关需放剑风(3气)+震山掌(3气)，配足初始气让它名实相符地出招 */
+    startAi: { qi: 6, shield: 0, pos: "ground" },
     /* 木人先举牌示招（resolveMove 前把告示作为 log），再出招 */
     script: [
       { round: 1, banner: "木人举牌：剑风——扫屋脊、平地！", move: "剑风" },
@@ -87,6 +89,8 @@ export const CHAPTERS = [
     goal: { text: "护体 · 以罡气挡下震山掌", kind: "shield_block", move: "震山掌" },
     roundTime: 14,
     startPlayer: { qi: 3, shield: 0, pos: "ground" },
+    /* 木人本关末回合要放震山掌(3气)，配足气：第1回合蓄力吐纳 +1 → 第2回合放3气掌 */
+    startAi: { qi: 3, shield: 0, pos: "ground" },
     script: [
       { round: 1, banner: "木人蓄力：震山掌，下回合落地！", move: "吐纳" },
       { round: 2, move: "震山掌" },
