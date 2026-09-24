@@ -327,11 +327,14 @@ function buildStoryChapterList() {
   const ul = $("story-chap-list");
   if (!ul) return;
   ul.innerHTML = "";
-  const progress = loadProgress();
+  const progress = loadProgress();        // 已通关关数（含正在打的那一关之前的）
+  const total = getChapters().length;
   getChapters().forEach((ch, idx) => {
     const li = document.createElement("li");
     li.className = "sch";
-    const unlocked = idx === 0 || idx < progress;
+    /* 解锁规则：已通关的关（idx < progress）可随时复通；
+       紧邻下一关（idx === progress）可挑战；其余未开。 */
+    const unlocked = idx <= Math.max(0, progress);
     const passed = idx < progress;
     if (!unlocked) li.classList.add("locked");
     li.dataset.idx = String(idx);
@@ -344,6 +347,8 @@ function buildStoryChapterList() {
     });
     ul.appendChild(li);
   });
+  /* progress 永远不超过 total（saveProgress 端已 clamp，这里兜底） */
+  void total;
 }
 
 function selectStoryChapter(idx) {
@@ -378,8 +383,7 @@ export function storyBack() {
 export function enterStoryChapter(idx) {
   const ch = getChapters()[idx];
   if (!ch || ch.type !== "combat") return;
-  /* 复通此关：先把进度重置回 idx，避免再次复通后无法继续下一关 */
-  if (idx < loadProgress()) saveProgress(idx);
+  /* 注：复通此关不再回写进度——progress 永远只增不减，避免锁住下一关 */
   $("story-scr").classList.add("hidden");
   $("game-scr").classList.remove("hidden");
   /* 弹幕前对白，点完进入正常 select 阶段 */
@@ -395,7 +399,7 @@ function endStoryDialog() {
   /* 序幕幕：对白结束 → 直接跳下一幕（或回菜单，已通关） */
   const next = S.storyChapter + 1;
   if (next < CHAPTERS.length) {
-    saveProgress(next);
+    saveProgress(Math.max(next, loadProgress()));
     startStory(next);
   } else {
     saveProgress(CHAPTERS.length);
@@ -406,15 +410,16 @@ function endStoryDialog() {
 }
 function passStory() {
   const ch = CHAPTERS[S.storyChapter];
-  /* 进阶：对白结束后升级进度 */
-  const next = S.storyChapter + 1;
-  saveProgress(Math.max(next, S.storyChapter + 1));
+  /* 通关后存"已通关数"= 当前关索引 + 1。
+     用 Math.max 避免复通已完成历史关时把进度压低。 */
+  const passed = S.storyChapter + 1;
+  saveProgress(Math.max(passed, loadProgress()));
   const lines = [];
   if (ch.pass)  lines.push(ch.pass);
   if (ch.pass2) lines.push(ch.pass2);
   if (ch.pass3) lines.push(ch.pass3);
   showDialog(lines, () => {
-    if (next < CHAPTERS.length) startStory(next);
+    if (passed < CHAPTERS.length) startStory(passed);
     else { S.storyMode = false; setFeedback("五课已毕，江湖路自此开启", 2.4); toMenu(); }
   });
 }
