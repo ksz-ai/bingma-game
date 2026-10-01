@@ -10,7 +10,7 @@ import { skillSound, SFX, thud, clang, startBgm, stopBgm } from "./audio.js";
 import { spawnDmgFx, spawnSkillFx, fxClash, FX_DUR } from "./fx.js";
 import * as net from "./net.js";
 import { CHAPTERS, loadProgress, saveProgress } from "./story.js";
-import { showDialog as renderShowDialog } from "./render.js";
+import { showDialog as renderShowDialog, render } from "./render.js";
 
 export function trySelect(name) {
   /* 剧情对白显示时禁止出招 */
@@ -183,7 +183,7 @@ export function showResult(res) {
   panel.className = res;
   $("ov-title").textContent = res === "win" ? "胜" : res === "draw" ? "平" : "败";
   const pvp = S.gameMode === "pvp";
-  $("btn-retry").style.display = pvp ? "none" : "";
+  $("btn-retry").style.display = (pvp || S.storyMode) ? "none" : "";
   $("ov-hint").textContent = pvp ? "M 回客栈" : "R 再战 · M 回菜单";
   ov.classList.remove("hidden");
   if (res === "win") SFX.win(); else if (res === "lose") SFX.lose(); else SFX.draw();
@@ -221,13 +221,29 @@ export function startGame(mode = "pve") {
 }
 
 /* ══════════ 剧情模式 ══════════
-   startStory(idx)：进入第 idx 幕（0 序幕，1 一课，... 5 结业）。
-   序幕（intro）直接走对白；其余幕走真实战斗，结算后自检过关。
-   storyMove()：waiting 阶段从脚本取出本回合对手招式。
-   advanceStory()：对白点按时推进 */
+   主菜单「初入兵马」→ openStory()：只打开关卡选择界面，不开局、不进游戏循环。
+   选择界面按「入局 / 复通此关」→ enterStoryChapter(idx) → startStory(idx) 才真正开局：
+   纯对白幕直接放对白；战斗幕先放引入对白，点完才开始倒计时出招。
+   通关 / 失败 / 中途退出 → backToStorySelect() 返回关卡选择界面并默认选中下一关。
+   storyMove()：waiting 阶段从脚本取出本回合对手招式。 */
+export function openStory() {
+  S.mode = "story";
+  S.storyMode = false;
+  S.storyResolveHook = null;
+  S.result = null;
+  $("overlay").classList.add("hidden");
+  $("menu-scr").classList.add("hidden");
+  $("game-scr").classList.add("hidden");
+  $("story-scr").classList.remove("hidden");
+  buildStoryChapterList();
+  /* 默认选中第一个未通关的关（全部通关则选中最后一关） */
+  selectStoryChapter(Math.min(loadProgress(), getChapters().length - 1));
+  SFX.tap();
+}
+
 export function startStory(idx) {
   const ch = CHAPTERS[idx];
-  if (!ch) return toMenu();
+  if (!ch) return openStory();
   stopBgm();
   S.storyMode = true;
   S.storyChapter = idx;
@@ -241,7 +257,7 @@ export function startStory(idx) {
   S.gameMode = "pve";
   S.timerMax = ch.roundTime || ROUND_TIME;
   const ph = S.hero;
-  const ah = ch.type === "combat" ? HEROES[0] : HEROES[0];   // 木人占位用首个标准角色
+  const ah = HEROES[0];                     // 木人占位用首个标准角色
   S.gs = newState(ph, ah);
   if (ch.startPlayer) {
     S.gs.player.qi = ch.startPlayer.qi;
@@ -264,6 +280,7 @@ export function startStory(idx) {
   $("fx").innerHTML = "";
   $("overlay").classList.add("hidden");
   $("menu-scr").classList.add("hidden");
+  $("story-scr").classList.add("hidden");
   $("game-scr").classList.remove("hidden");
   S.mode = "game";
   SFX.start();
@@ -295,32 +312,39 @@ export function startStory(idx) {
       if (S.gs.round >= lastRound) settled = true;
     }
     if (pass) return void setTimeout(passStory, 400);
-    if (settled) setTimeout(failStory, 400);   // 对局已结束仍未达标 → 重开本幕
+    if (settled) setTimeout(failStory, 400);   // 对局已结束仍未达标 → 回关卡选择
     /* 否则：对局未结束 → 静默继续下一回合 */
   };
-  /* 章节流程：
-     - 纯对白幕（序幕）：弹对白，点完直接跳下一幕
-     - 战斗幕：先把故事界面打开（左侧关卡列表 + 右侧详情卡），玩家按"入局"才进入游戏屏 */
+  /* 纯对白幕：放完对白即算此关通关；战斗幕：引入对白点完才开始选招计时 */
   if (ch.type === "dialog") {
-    $("menu-scr").classList.add("hidden");
-    $("chapter-scr")?.classList.add("hidden");
-    $("game-scr").classList.remove("hidden");
-    showDialog(ch.lines, () => { if (ch.type === "dialog") endStoryDialog(); });
-    return;
+    showDialog(ch.lines, () => storyChapterDone(idx));
+  } else {
+    showDialog(ch.intro, () => { S.phase = "select"; S.timer = S.timerMax; render(); });
   }
-  openStoryScreen();
-  selectStoryChapter(idx);
+  render();
 }
 
 /* ══════════ 故事界面（独立路由） ══════════ */
 let storySelectedIdx = 0;
 
-function openStoryScreen() {
-  $("menu-scr").classList.add("hidden");
+/* 一幕结束回到关卡选择界面：selIdx 为返回后默认选中的关 */
+function backToStorySelect(selIdx) {
+  S.storyMode = false;
+  S.storyResolveHook = null;
+  S.result = null;
+  S.mode = "story";
+  $("overlay").classList.add("hidden");
   $("game-scr").classList.add("hidden");
-  $("chapter-scr")?.classList.add("hidden");
   $("story-scr").classList.remove("hidden");
   buildStoryChapterList();
+  selectStoryChapter(Math.max(0, Math.min(selIdx, getChapters().length - 1)));
+  startBgm();
+}
+
+/* 对白幕放完：记进度（只增不减），回选择界面并选中下一关 */
+function storyChapterDone(idx) {
+  saveProgress(Math.max(idx + 1, loadProgress()));
+  backToStorySelect(idx + 1);
 }
 
 function buildStoryChapterList() {
@@ -375,65 +399,50 @@ function selectStoryChapter(idx) {
 }
 
 export function storyBack() {
+  S.mode = "menu";
   $("story-scr").classList.add("hidden");
   $("menu-scr").classList.remove("hidden");
+  SFX.tap();
+  startBgm();
 }
 
-/* 从故事界面"入局/复通此关"按钮进入实际战斗 */
+/* 从故事界面"入局/复通此关"按钮进入实际对局（对白幕同样可入） */
 export function enterStoryChapter(idx) {
   const ch = getChapters()[idx];
-  if (!ch || ch.type !== "combat") return;
-  /* 注：复通此关不再回写进度——progress 永远只增不减，避免锁住下一关 */
-  $("story-scr").classList.add("hidden");
-  $("game-scr").classList.remove("hidden");
-  /* 弹幕前对白，点完进入正常 select 阶段 */
-  showDialog(ch.intro, () => { S.phase = "select"; S.timer = S.timerMax; render(); });
-  render();
+  if (!ch) return;
+  if (idx > loadProgress()) return;      // 未解锁的关不可入
+  startStory(idx);
+}
+
+/* 剧情战斗中 ESC 中途退出：回关卡选择界面，不记进度 */
+export function exitStory() {
+  backToStorySelect(S.storyChapter);
 }
 
 /* 对白推进的回调：直接交给 render.showDialog */
 function showDialog(lines, onDone) {
   renderShowDialog(lines, onDone);
 }
-function endStoryDialog() {
-  /* 序幕幕：对白结束 → 直接跳下一幕（或回菜单，已通关） */
-  const next = S.storyChapter + 1;
-  if (next < CHAPTERS.length) {
-    saveProgress(Math.max(next, loadProgress()));
-    startStory(next);
-  } else {
-    saveProgress(CHAPTERS.length);
-    S.storyMode = false;
-    setFeedback("五课已毕，江湖路自此开启", 2.4);
-    toMenu();
-  }
-}
 function passStory() {
+  if (!S.storyMode || S.mode !== "game") return;
   const ch = CHAPTERS[S.storyChapter];
-  /* 通关后存"已通关数"= 当前关索引 + 1。
-     用 Math.max 避免复通已完成历史关时把进度压低。 */
-  const passed = S.storyChapter + 1;
-  saveProgress(Math.max(passed, loadProgress()));
+  const idx = S.storyChapter;
+  /* 通关后存"已通关数"= 当前关索引 + 1，只增不减 */
+  saveProgress(Math.max(idx + 1, loadProgress()));
   const lines = [];
   if (ch.pass)  lines.push(ch.pass);
   if (ch.pass2) lines.push(ch.pass2);
   if (ch.pass3) lines.push(ch.pass3);
-  showDialog(lines, () => {
-    if (passed < CHAPTERS.length) startStory(passed);
-    else { S.storyMode = false; setFeedback("五课已毕，江湖路自此开启", 2.4); toMenu(); }
-  });
+  $("overlay").classList.add("hidden");   // 防止胜负遮罩压住通关对白
+  showDialog(lines, () => backToStorySelect(idx + 1));
 }
 function failStory() {
+  if (!S.storyMode || S.mode !== "game") return;
   const ch = CHAPTERS[S.storyChapter];
-  if (ch.fail) {
-    showDialog([ch.fail], () => {
-      /* 失败不重置整场，简化处理：重开本幕 */
-      startStory(S.storyChapter);
-    });
-  } else {
-    /* 没有失败对白（如一课聚气）直接重开 */
-    startStory(S.storyChapter);
-  }
+  const idx = S.storyChapter;
+  $("overlay").classList.add("hidden");
+  if (ch.fail) showDialog([ch.fail], () => backToStorySelect(idx));
+  else backToStorySelect(idx);
 }
 
 /* 剧情每回合对手出招：脚本模式按表查找，AI 模式返回 null（让 aiChoose 接手） */
@@ -473,7 +482,7 @@ export function getChapters() { return CHAPTERS; }
 export function toMenu() {
   if (S.gameMode === "pvp") net.leaveRoom();
   S.mode = "menu"; S.result = null; S.gameMode = "pve";
-  S.storyMode = false;
+  S.storyMode = false; S.storyResolveHook = null;
   $("overlay").classList.add("hidden");
   $("game-scr").classList.add("hidden");
   $("menu-scr").classList.remove("hidden");

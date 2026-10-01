@@ -241,6 +241,7 @@ export function render() {
       b.classList.toggle("hot", b.dataset.id === S.hero.id));
     return;
   }
+  if (S.mode !== "game") return;   // 关卡选择等界面不渲染战斗 UI
   renderHeader();
   renderCards();
   renderTokens();

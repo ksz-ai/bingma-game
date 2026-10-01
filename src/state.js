@@ -42,7 +42,7 @@ export const heroCost = (hero, name) =>
   (hero && hero.freeMoves && hero.freeMoves.includes(name)) ? 0 : ACTIONS[name].cost;
 
 export const S = {
-  mode: "menu",            // menu | game
+  mode: "menu",            // menu | story(关卡选择) | game
   gameMode: "pve",         // pve | pvp
   selectedDiff: "简单",
   hero: HEROES[0],          // 我方当前所选角色

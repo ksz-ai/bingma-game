@@ -2,12 +2,11 @@
 import "./style.css";
 import { $ } from "./util.js";
 import { SKILLS, KEYMAP, DIFFS, HEROES, S } from "./state.js";
-import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, startStory, getChapters, enterStoryChapter, storyBack } from "./engine.js";
+import { trySelect, startGame, toMenu, update, handleNetState, handleNetError, openStory, enterStoryChapter, storyBack, exitStory } from "./engine.js";
 import { SFX, toggleMute, startBgm, isBgmOn } from "./audio.js";
-import { render, bindDialogClicks, showDialog } from "./render.js";
+import { render, bindDialogClicks } from "./render.js";
 import { skinSVG } from "./render.js";
 import * as net from "./net.js";
-import { loadProgress } from "./story.js";
 
 bindDialogClicks();
 
@@ -85,8 +84,8 @@ $("btn-retry").addEventListener("click", () => startGame());
 $("btn-menu").addEventListener("click", toMenu);
 $("btn-sound").addEventListener("click", toggleMute);
 
-/* ══════════ 剧情入口：独立路由界面 ══════════ */
-$("btn-story").addEventListener("click", () => startStory(0));
+/* ══════════ 剧情入口：先打开关卡选择界面，选关后才入局 ══════════ */
+$("btn-story").addEventListener("click", openStory);
 $("story-back").addEventListener("click", storyBack);
 $("sd-enter").addEventListener("click", () => enterStoryChapter(S.storyChapter));
 
@@ -182,6 +181,8 @@ $("join-code").addEventListener("keydown", e => {
 });
 
 addEventListener("keydown", e => {
+  /* 关卡选择界面的按键统一由 onStoryKey 处理，避免重复响应 */
+  if (!$("story-scr").classList.contains("hidden")) return;
   if (S.mode === "menu") {
     if (inLobby) {
       if (e.key === "Escape") backFromLobby();
@@ -189,7 +190,7 @@ addEventListener("keydown", e => {
     }
     if (e.key === "s" || e.key === "S" || e.key === "Enter" || e.key === " ") startGame();
     else if (e.key === "n" || e.key === "N") showLobby();
-    else if (e.key === "t" || e.key === "T") startStory(0);
+    else if (e.key === "t" || e.key === "T") openStory();
     else if (e.key === "d" || e.key === "D" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
       S.selectedDiff = DIFFS[(DIFFS.indexOf(S.selectedDiff) + 1) % DIFFS.length];
       SFX.tap();
@@ -197,16 +198,21 @@ addEventListener("keydown", e => {
     return;
   }
   if (e.key === "Escape") {
-    /* 剧情对白显示时：ESC 跳过整段对白（不退出游戏）；否则回菜单 */
+    /* 剧情对白显示时：ESC 跳过整段对白；剧情战斗中：退回关卡选择；否则回菜单 */
     const dlg = $("dialog");
     if (S.storyMode && dlg && !dlg.classList.contains("hidden")) {
       dlg.click();
       return;
     }
+    if (S.storyMode) { exitStory(); return; }
     toMenu();
     return;
   }
   if (S.result) {
+    if (S.storyMode) {
+      if (e.key === "m" || e.key === "M") exitStory();
+      return;
+    }
     if (e.key === "r" || e.key === "R") startGame();
     else if (e.key === "m" || e.key === "M") toMenu();
     return;
