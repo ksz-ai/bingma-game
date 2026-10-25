@@ -251,6 +251,9 @@ function tick(t) {
 }
 requestAnimationFrame(tick);
 
+/* 调试：?debug=ai 让困难 AI 每回合在战报里显示读心预测对错 */
+if (new URLSearchParams(location.search).get("debug") === "ai") S.aiDebug = true;
+
 if (location.hash.startsWith("#game")) {
   // 调试用：#game 直接进入游戏；?hero=xxx 指定我方角色
   const h = new URLSearchParams(location.search).get("hero");
