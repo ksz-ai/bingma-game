@@ -10,27 +10,73 @@ import * as net from "./net.js";
 
 bindDialogClicks();
 
-/* ══════════ 菜单规则表 ══════════ */
-function buildMenu() {
-  const rules = [
-    ["吐纳(1)", "气 +1"],
-    ["轻功(2) / 遁地(3)", "上屋脊、入水底避险，每回合归位"],
-    ["袖箭(4)", "耗 1 气 · 1 伤 · 仅中平地"],
-    ["剑风(5) / 震山掌(6)", "耗 3 气 · 3 伤 · 各扫两处"],
-    ["金钟罩(7)", "耗 3 气 · 罡气 +3，跨回合保留"],
-    ["万剑归宗(8)", "耗 7 气 · 一招制胜！"],
-    ["相抵", "两招同时命中且伤值相同，互不受伤"],
-    ["胜负", "罡气挡不住伤害，当即落败"],
-  ];
-  const wrap = $("rule-rows");
-  rules.forEach(([n, d]) => {
+/* ══════════ 规则内容（主菜单与局内面板共用一份） ══════════ */
+const RULES = [
+  ["吐纳(1)", "气 +1"],
+  ["轻功(2) / 遁地(3)", "上屋脊、入水底避险，每回合归位"],
+  ["袖箭(4)", "耗 1 气 · 1 伤 · 仅中平地"],
+  ["剑风(5) / 震山掌(6)", "耗 3 气 · 3 伤 · 各扫两处"],
+  ["金钟罩(7)", "耗 3 气 · 罡气 +3，跨回合保留"],
+  ["万剑归宗(8)", "耗 7 气 · 一招制胜！"],
+  ["压制", "两招同时命中且伤值不同：伤值高者压过低者，弱招作废"],
+  ["相抵", "两招同时命中且伤值相同，互不受伤"],
+  ["胜负", "罡气挡不住伤害，当即落败"],
+];
+function renderRulesInto(wrap) {
+  RULES.forEach(([n, d]) => {
     const row = document.createElement("div");
     row.className = "rule-row";
     row.innerHTML = '<span class="rn">' + n + '</span><span class="rd">' + d + "</span>";
     wrap.appendChild(row);
   });
 }
+function buildMenu() { renderRulesInto($("rule-rows")); }
 buildMenu();
+
+/* ══════════ 局内规则面板：? / H 或右下角问号，查阅不暂停倒计时 ══════════ */
+const COVERAGE = [
+  ["招式（耗气）", "屋脊", "平地", "水底"],
+  ["袖箭（1气）", "落空", "命中 1 伤", "落空"],
+  ["剑风（3气）", "命中 3 伤", "命中 3 伤", "落空"],
+  ["震山掌（3气）", "落空", "命中 3 伤", "命中 3 伤"],
+  ["万剑归宗（7气）", "制胜", "制胜", "制胜"],
+];
+const HELP_KEYS = [
+  "数字键 1-8 · 点牌出招",
+  "? / H · 开关本面板",
+  "ESC · 关面板 / 收剑回菜单",
+  "R 再战 · M 回客栈 · S 开战",
+  "T 剧情关卡 · N 联机对战",
+];
+function buildHelp() {
+  renderRulesInto($("hp-rules"));
+  COVERAGE.forEach((cells, r) => {
+    const row = document.createElement("div");
+    row.className = "hp-row" + (r === 0 ? " hp-head" : "");
+    cells.forEach((c, i) => {
+      const cell = document.createElement("span");
+      cell.className = "hp-cell" + (i ? (c.includes("落空") ? " hp-miss" : " hp-hit") : " hp-name");
+      cell.textContent = c;
+      row.appendChild(cell);
+    });
+    $("hp-cover").appendChild(row);
+  });
+  HELP_KEYS.forEach(k => {
+    const line = document.createElement("div");
+    line.className = "hp-key";
+    line.textContent = "· " + k;
+    $("hp-keys").appendChild(line);
+  });
+}
+buildHelp();
+const helpPanel = $("help-panel");
+function toggleHelp(force) {
+  const show = force !== undefined ? force : helpPanel.classList.contains("hidden");
+  helpPanel.classList.toggle("hidden", !show);
+  SFX.tap();
+}
+$("btn-help").addEventListener("click", () => toggleHelp());
+helpPanel.addEventListener("click", e => { if (e.target === helpPanel) toggleHelp(false); });
 
 /* ══════════ 角色选择构建 ══════════ */
 function buildHeroRow() {
@@ -181,6 +227,15 @@ $("join-code").addEventListener("keydown", e => {
 });
 
 addEventListener("keydown", e => {
+  /* 规则面板开着时：只响应关闭键，其他快捷键一概不触发 */
+  if (!helpPanel.classList.contains("hidden")) {
+    if (e.key === "Escape" || e.key === "?" || e.key === "h" || e.key === "H") {
+      toggleHelp(false);
+      e.preventDefault();
+    }
+    return;
+  }
+  if (e.key === "?" || e.key === "h" || e.key === "H") { toggleHelp(); e.preventDefault(); return; }
   /* 关卡选择界面的按键统一由 onStoryKey 处理，避免重复响应 */
   if (!$("story-scr").classList.contains("hidden")) return;
   if (S.mode === "menu") {

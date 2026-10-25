@@ -32,6 +32,7 @@
   </div>
   <div id="wm" aria-hidden="true">武</div>
   <button id="btn-sound" title="古琴音效开关">音</button>
+  <button id="btn-help" title="规则与快捷键 (?)">?</button>
 
   <!-- 主菜单 -->
   <section id="menu-scr">
@@ -206,6 +207,21 @@
       </div>
     </div>
   </section>
+
+  <!-- 局内规则面板：? / H 或右下角问号开关，查阅不暂停倒计时 -->
+  <div id="help-panel" class="hidden">
+    <div id="hp-card">
+      <div id="hp-title">兵马 · 对弈之约</div>
+      <div id="hp-rules"></div>
+      <hr class="hp-hr">
+      <div class="hp-sub">招式命中覆盖</div>
+      <div id="hp-cover"></div>
+      <hr class="hp-hr">
+      <div class="hp-sub">快捷键</div>
+      <div id="hp-keys"></div>
+      <div id="hp-foot">点击空白处或按 ? / ESC 收起 · 查阅不暂停倒计时</div>
+    </div>
+  </div>
 </div>
 
 <script type="module" src="/src/main.js"></script>

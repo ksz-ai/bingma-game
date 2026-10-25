@@ -961,3 +961,51 @@
   .dlg-who { font-size: 18px; }
   .dlg-text { font-size: 14.5px; line-height: 1.7; }
 }
+
+/* ══════════ 局内规则面板与问号按钮 ══════════ */
+#btn-help {
+  position: absolute; right: 52px; bottom: 10px; z-index: 26;
+  width: 34px; height: 34px; border-radius: 4px;
+  background: var(--paper-2); border: 1.5px solid var(--ink-3); color: var(--ink-2);
+  font-family: var(--f-kai); font-size: 17px; cursor: pointer;
+  box-shadow: 2px 2px 0 rgba(25,23,20,.15);
+}
+#btn-help:hover { border-color: var(--vermil); color: var(--vermil); }
+#help-panel {
+  position: absolute; inset: 0; z-index: 28;
+  background: rgba(20,18,14,.45);
+  display: flex; align-items: center; justify-content: center;
+}
+#hp-card {
+  width: min(560px, 92%); max-height: 86%; overflow-y: auto;
+  background: var(--paper); border: 2px solid var(--ink);
+  box-shadow: 6px 6px 0 rgba(25,23,20,.3);
+  padding: 18px 24px 14px;
+}
+#hp-title {
+  font-family: var(--f-shu); font-size: 26px; letter-spacing: 6px;
+  text-align: center; color: var(--ink); margin-bottom: 8px;
+}
+#hp-card .rule-row .rn { width: 200px; }
+.hp-hr {
+  height: 3px; border: none; margin: 10px 0 8px; opacity: .5;
+  background: linear-gradient(90deg, transparent, var(--ink) 15%, var(--ink) 85%, transparent);
+}
+.hp-sub { font-family: var(--f-kai); font-size: 15px; letter-spacing: 3px; color: var(--ink-3); margin-bottom: 5px; }
+.hp-row { display: flex; gap: 4px; padding: 3px 0; }
+.hp-row.hp-head .hp-cell { color: var(--ink-3); font-size: 12.5px; }
+.hp-cell { flex: 1; text-align: center; font-family: var(--f-song); font-size: 13.5px; color: var(--ink); }
+.hp-cell.hp-name { flex: 1.4; text-align: left; font-family: var(--f-kai); }
+.hp-cell.hp-miss { color: var(--ink-4); }
+.hp-cell.hp-hit { color: var(--vermil); }
+.hp-key { font-family: var(--f-kai); font-size: 13.5px; color: var(--ink-2); padding: 2px 0; }
+#hp-foot { margin-top: 10px; text-align: center; font-family: var(--f-kai); font-size: 12.5px; color: var(--ink-4); }
+
+@media (max-width: 760px) {
+  #btn-help { right: 42px; bottom: auto; top: calc(6px + env(safe-area-inset-top)); width: 28px; height: 28px; font-size: 14px; }
+  #hp-card { padding: 14px 14px 10px; }
+  #hp-card .rule-row .rn { width: 128px; font-size: 14px; }
+  #hp-card .rule-row .rd { font-size: 12px; }
+  .hp-cell { font-size: 12px; }
+  .hp-cell.hp-name { font-size: 12.5px; }
+}

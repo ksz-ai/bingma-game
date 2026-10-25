@@ -161,7 +161,10 @@ function renderLog() {
     box.className = "settle";
     let h = '<div class="vs-row"><span class="vp">你 · ' + S.report.pm +
             '</span><span class="vv">对 决</span><span class="va">对手 · ' + S.report.am + "</span></div><hr>";
-    const lines = S.report.lines.slice(0, 2);
+    /* 解释行（相抵/压制）优先于伤害行，避免被 2 行上限挤掉 */
+    const all = S.report.lines;
+    const pri = all.filter(x => x.includes("相撞") || x.includes("压过"));
+    const lines = pri.concat(all.filter(x => !pri.includes(x))).slice(0, 2);
     if (lines.length) {
       lines.forEach((m, i) => { h += '<div class="' + (i === 0 ? "l1" : "l2") + '">› ' + m + "</div>"; });
     } else {
