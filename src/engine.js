@@ -5,7 +5,7 @@
 import { $, now } from "./util.js";
 import { ACTIONS, HEROES, heroById, heroCost, ROUND_TIME, WAIT_TIME, REVEAL_TIME, PVP_ROUND_TIME, S, setFeedback, newState, logMsg } from "./state.js";
 import { resolveCombat } from "./settle.js";
-import { aiChoose } from "./ai.js";
+import { aiChoose, aiAfterSettle, resetAiMemory } from "./ai.js";
 import { skillSound, SFX, thud, clang, startBgm, stopBgm } from "./audio.js";
 import { spawnDmgFx, spawnSkillFx, fxClash, FX_DUR } from "./fx.js";
 import * as net from "./net.js";
@@ -33,6 +33,7 @@ export function trySelect(name) {
 export function settle(pm, am) {
   const pS = S.gs.player.shield, aS = S.gs.ai.shield, base = S.gs.log.length;
   S.aiMove = am;
+  if (S.gameMode === "pve") aiAfterSettle(pm);   /* PvE 才记招（联机对手是人，AI 不出招） */
   const r = resolveCombat(pm, am);
   S.clashed = r.clashed;
   S.cancelled = r.cancelled;
@@ -203,6 +204,7 @@ export function startGame(mode = "pve") {
     ah = heroById(net.peerHeroId()) || HEROES[0];
   }
   S.gs = newState(ph, ah);
+  resetAiMemory();
   S.phase = "select"; S.pending = null; S.aiMove = null;
   S.timer = S.timerMax; S.report = null; S.result = null; S.fbMsg = null;
   S.pendingResult = null; S.revealDur = REVEAL_TIME;
@@ -259,6 +261,7 @@ export function startStory(idx) {
   const ph = S.hero;
   const ah = HEROES[0];                     // 木人占位用首个标准角色
   S.gs = newState(ph, ah);
+  resetAiMemory();
   if (ch.startPlayer) {
     S.gs.player.qi = ch.startPlayer.qi;
     S.gs.player.shield = ch.startPlayer.shield;

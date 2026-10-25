@@ -53,6 +53,7 @@ export const S = {
   fbMsg: null, fbUntil: 0,
   report: null, result: null,
   pendingResult: null, revealDur: REVEAL_TIME,
+  aiDebug: false,                /* ?debug=ai 开启：每回合在战报里显示读心预测对错 */
   clashed: false,
   cancelled: { player: false, ai: false },   // 同时命中时被高伤招式压制作废的一方
   // 联机
