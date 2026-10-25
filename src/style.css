@@ -1033,3 +1033,10 @@
   .gainnum { left: calc(50% + 24px); top: calc(50% - 52px); font-size: 20px; }
   #cd-num { font-size: 18px; }
 }
+
+/* ══════════ 结算统计行 · 房号复制按钮 ══════════ */
+#ov-stats {
+  font-family: var(--f-kai); font-size: 15px; letter-spacing: 1.5px;
+  color: var(--ink-3); margin-top: -8px;
+}
+#btn-copy-code { margin-top: 10px; }

@@ -52,6 +52,9 @@ export function settle(pm, am) {
   const absorbed = (preShield, dmg) => Math.min(preShield, dmg);
   const pd = hitOf("ai", am)     ? Math.max(0, dmgOf(am) - absorbed(pS, dmgOf(am))) : 0;
   const ad = hitOf("player", pm) ? Math.max(0, dmgOf(pm) - absorbed(aS, dmgOf(pm))) : 0;
+  /* 本局统计：我造成的实际伤害 + 我罡气挡下的伤害 */
+  S.gs.stats.dealt += ad;
+  S.gs.stats.blocked += hitOf("ai", am) ? absorbed(pS, dmgOf(am)) : 0;
   S.report = {
     pm, am,
     pd, ad,
@@ -186,6 +189,9 @@ export function showResult(res) {
   const ov = $("overlay"), panel = $("ov-panel");
   panel.className = res;
   $("ov-title").textContent = res === "win" ? "胜" : res === "draw" ? "平" : "败";
+  const st = S.gs.stats || { dealt: 0, blocked: 0 };
+  $("ov-stats").textContent =
+    "第 " + S.gs.round + " 回合分胜负 · 你造成 " + st.dealt + " 伤 · 挡下 " + st.blocked + " 伤";
   const pvp = S.gameMode === "pvp";
   $("btn-retry").style.display = (pvp || S.storyMode) ? "none" : "";
   $("ov-hint").textContent = pvp ? "M 回客栈" : "R 再战 · M 回菜单";

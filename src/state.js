@@ -72,6 +72,7 @@ export function newState(ph = HEROES[0], ah = HEROES[0]) {
     player: { qi: ph.startQi, shield: ph.startShield, pos: "ground", hero: ph },
     ai:     { qi: ah.startQi, shield: ah.startShield, pos: "ground", hero: ah },
     log: [],
+    stats: { dealt: 0, blocked: 0 },   /* 本局累计：我造成的伤 / 我罡气挡下的伤 */
   };
 }
 

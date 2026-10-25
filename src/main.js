@@ -197,6 +197,25 @@ function enterPvp() {
 $("btn-pvp").addEventListener("click", showLobby);
 $("btn-lobby-back").addEventListener("click", backFromLobby);
 
+/* 房号一键复制：剪贴板不可用时降级为全选房号文字 */
+$("btn-copy-code").addEventListener("click", async () => {
+  const code = $("room-code").textContent.trim();
+  if (!code || code === "----") return;
+  const btn = $("btn-copy-code");
+  try {
+    await navigator.clipboard.writeText(code);
+    btn.textContent = "已复制 ✓";
+  } catch (e) {
+    const range = document.createRange();
+    range.selectNodeContents($("room-code"));
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    btn.textContent = "已全选房号";
+  }
+  setTimeout(() => { btn.textContent = "复制房号"; }, 1500);
+});
+
 $("btn-host").addEventListener("click", async () => {
   try {
     const code = await net.createRoom();
