@@ -7,7 +7,7 @@ import { ACTIONS, HEROES, heroById, heroCost, ROUND_TIME, WAIT_TIME, REVEAL_TIME
 import { resolveCombat } from "./settle.js";
 import { aiChoose } from "./ai.js";
 import { skillSound, SFX, thud, clang, startBgm, stopBgm } from "./audio.js";
-import { spawnDmgFx, spawnSkillFx, fxClash, FX_DUR } from "./fx.js";
+import { spawnDmgFx, spawnGainFx, spawnSkillFx, fxClash, FX_DUR } from "./fx.js";
 import * as net from "./net.js";
 import { CHAPTERS, loadProgress, saveProgress } from "./story.js";
 import { showDialog as renderShowDialog, render } from "./render.js";
@@ -32,6 +32,7 @@ export function trySelect(name) {
 
 export function settle(pm, am) {
   const pS = S.gs.player.shield, aS = S.gs.ai.shield, base = S.gs.log.length;
+  const pQ0 = S.gs.player.qi, aQ0 = S.gs.ai.qi;   /* 结算前的气，用于正反馈浮字 */
   S.aiMove = am;
   const r = resolveCombat(pm, am);
   S.clashed = r.clashed;
@@ -58,6 +59,9 @@ export function settle(pm, am) {
   };
   S.pending = null;
   spawnDmgFx();
+  /* 攒气/护体金色浮字：只显示正增量（扣气、破罡不浮字） */
+  spawnGainFx("player", S.gs.player.qi - pQ0, S.gs.player.shield - pS);
+  spawnGainFx("ai", S.gs.ai.qi - aQ0, S.gs.ai.shield - aS);
 
   skillSound(pm, 0);
   skillSound(am, 0.24);

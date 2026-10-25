@@ -126,7 +126,13 @@ function renderTokens() {
 }
 
 function renderHeader() {
-  $("round-label").textContent = "第 " + S.gs.round + " 回合";
+  $("round-text").textContent = "第 " + S.gs.round + " 回合";
+  /* 出招阶段最后 3 秒：回合数字旁的朱砂倒计时脉冲 */
+  const cd = $("cd-num");
+  if (S.phase === "select" && S.timer <= 3 && S.timer > 0) {
+    cd.textContent = Math.ceil(S.timer);
+    cd.classList.remove("hidden");
+  } else cd.classList.add("hidden");
   const ratio = Math.max(0, Math.min(1, S.timer / S.timerMax));
   const fill = $("timer-fill");
   fill.style.width = ratio * 100 + "%";

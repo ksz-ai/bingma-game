@@ -18,6 +18,22 @@ export function spawnDmgFx() {
   });
 }
 
+/* 攒气/护体的正反馈浮字（金色 +N气 / +N罡），复用受击浮字的升腾轨迹 */
+export function spawnGainFx(side, dq, dsh) {
+  const tok = $(side === "player" ? "tok-p" : "tok-a");
+  const items = [];
+  if (dq > 0) items.push("+" + dq + "气");
+  if (dsh > 0) items.push("+" + dsh + "罡");
+  items.forEach((txt, i) => {
+    const el = document.createElement("div");
+    el.className = "gainnum";
+    if (i) el.style.top = "calc(50% - 78px)";   /* 气、罡同时浮起时错开高度 */
+    el.textContent = txt;
+    tok.appendChild(el);
+    setTimeout(() => el.remove(), 1300);
+  });
+}
+
 /* ══════════ 招式特效：依招式名生成对应动画 ══════════ */
 const other = s => (s === "player" ? "ai" : "player");
 
